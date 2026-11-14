@@ -1,0 +1,2815 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Dhaka Delivery Express - ঢাকা ডেলিভারি এক্সপ্রেস</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@400;600;700&family=Teko:wght@600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        * {
+            user-select: none;
+            -webkit-user-select: none;
+            box-sizing: border-box;
+        }
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #0f172a;
+            font-family: 'Hind Siliguri', sans-serif;
+        }
+        .font-display {
+            font-family: 'Teko', 'Hind Siliguri', sans-serif;
+        }
+        /* Bangladeshi Rickshaw/Truck Art Border */
+        .truck-art-border {
+            border: 4px solid #facc15;
+            box-shadow: 0 0 0 4px #dc2626, 0 0 0 8px #16a34a, 0 12px 25px rgba(0,0,0,0.7);
+            background: linear-gradient(135deg, #1e1b4b 0%, #0f172a 100%);
+        }
+        .truck-btn {
+            background: linear-gradient(180deg, #f59e0b 0%, #d97706 100%);
+            border: 3px solid #fef08a;
+            box-shadow: 0 5px 0 #92400e, 0 8px 15px rgba(0,0,0,0.4);
+            transition: all 0.1s ease;
+        }
+        .truck-btn:active {
+            transform: translateY(4px);
+            box-shadow: 0 1px 0 #92400e, 0 3px 6px rgba(0,0,0,0.4);
+        }
+        .truck-btn-green {
+            background: linear-gradient(180deg, #22c55e 0%, #15803d 100%);
+            border: 3px solid #bbf7d0;
+            box-shadow: 0 5px 0 #14532d, 0 8px 15px rgba(0,0,0,0.4);
+        }
+        .truck-btn-green:active {
+            transform: translateY(4px);
+            box-shadow: 0 1px 0 #14532d;
+        }
+        .truck-btn-red {
+            background: linear-gradient(180deg, #ef4444 0%, #b91c1c 100%);
+            border: 3px solid #fecaca;
+            box-shadow: 0 5px 0 #7f1d1d, 0 8px 15px rgba(0,0,0,0.4);
+        }
+        .truck-btn-red:active {
+            transform: translateY(4px);
+            box-shadow: 0 1px 0 #7f1d1d;
+        }
+        .pedal-btn {
+            backdrop-filter: blur(6px);
+            transition: transform 0.08s ease, background-color 0.1s;
+            touch-action: none;
+        }
+        .pedal-btn.active {
+            transform: scale(0.92) translateY(4px);
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+        @keyframes floatSlow {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-6px); }
+        }
+        .animate-float {
+            animation: floatSlow 3s ease-in-out infinite;
+        }
+    </style>
+</head>
+<body class="relative w-full h-full select-none overflow-hidden">
+
+    <!-- MAIN GAME CANVAS -->
+    <canvas id="gameCanvas"></canvas>
+
+    <!-- TOP HUD (In-Game) -->
+    <div id="hud" class="hidden absolute top-0 left-0 w-full p-2 sm:p-4 pointer-events-none z-20 flex flex-col gap-2">
+        <div class="flex flex-wrap justify-between items-start gap-2 max-w-7xl mx-auto w-full">
+            
+            <!-- Left Stats: Fuel, Damage, Cargo -->
+            <div class="bg-slate-900/85 border-2 border-yellow-400 rounded-xl p-2.5 sm:p-3 flex flex-col gap-1.5 shadow-xl pointer-events-auto min-w-[210px] sm:min-w-[260px]">
+                <div class="flex items-center justify-between text-xs sm:text-sm font-bold text-yellow-300">
+                    <span><i class="fa-solid fa-truck-fast mr-1 text-red-500"></i> <span id="hudLevelName">ঢাকা - মাওয়া</span></span>
+                    <span id="hudTaka" class="bg-green-700/90 text-white px-2 py-0.5 rounded border border-green-400">৳ ১২০০</span>
+                </div>
+
+                <!-- Fuel Bar -->
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-gas-pump text-amber-400 w-4 text-center text-xs sm:text-sm"></i>
+                    <div class="w-full bg-slate-700 h-3 rounded-full overflow-hidden border border-slate-500">
+                        <div id="fuelBar" class="bg-gradient-to-r from-red-500 via-amber-400 to-green-500 h-full w-full transition-all duration-150"></div>
+                    </div>
+                    <span id="fuelText" class="text-[11px] text-white font-bold w-9 text-right">100%</span>
+                </div>
+
+                <!-- Truck Health Bar -->
+                <div class="flex items-center gap-2">
+                    <i class="fa-solid fa-wrench text-sky-400 w-4 text-center text-xs sm:text-sm"></i>
+                    <div class="w-full bg-slate-700 h-3 rounded-full overflow-hidden border border-slate-500">
+                        <div id="healthBar" class="bg-gradient-to-r from-sky-500 to-emerald-400 h-full w-full transition-all duration-150"></div>
+                    </div>
+                    <span id="healthText" class="text-[11px] text-white font-bold w-9 text-right">100%</span>
+                </div>
+
+                <!-- Cargo Counter -->
+                <div class="flex items-center justify-between pt-1 border-t border-slate-700 text-xs sm:text-sm">
+                    <span class="text-orange-300 font-semibold"><i class="fa-solid fa-boxes-stacked mr-1"></i> মালপত্র (Cargo):</span>
+                    <span id="cargoCountText" class="font-bold text-white bg-orange-600 px-2 py-0.5 rounded-full">8 / 8</span>
+                </div>
+            </div>
+
+            <!-- Center Progress Bar & Distance -->
+            <div class="bg-slate-900/85 border-2 border-emerald-400 rounded-xl p-2 sm:p-3 flex flex-col items-center shadow-xl flex-1 max-w-md mx-auto">
+                <div class="w-full flex justify-between text-[11px] sm:text-xs text-emerald-300 font-bold mb-1">
+                    <span><i class="fa-solid fa-warehouse"></i> ঢাকা ঘাট</span>
+                    <span id="distanceText">0m / 1800m</span>
+                    <span>গন্তব্য <i class="fa-solid fa-flag-checkered"></i></span>
+                </div>
+                <div class="w-full bg-slate-800 h-3.5 rounded-full overflow-hidden border border-emerald-500/60 relative">
+                    <div id="progressBar" class="bg-gradient-to-r from-amber-500 via-yellow-400 to-emerald-500 h-full w-0"></div>
+                </div>
+                <!-- Speed & Gear -->
+                <div class="flex items-center gap-4 mt-1.5 text-xs sm:text-sm font-bold text-white">
+                    <span><i class="fa-solid fa-gauge-high text-red-400 mr-1"></i> গতি: <span id="speedText" class="text-yellow-300">0</span> কি.মি/ঘণ্টা</span>
+                    <span><i class="fa-solid fa-clock text-sky-300 mr-1"></i> সময়: <span id="timerText" class="text-sky-200">00:00</span></span>
+                </div>
+            </div>
+
+            <!-- Right Quick Action Buttons -->
+            <div class="flex items-center gap-2 pointer-events-auto">
+                <a href="https://wa.me/+8801516514216" target="_blank" rel="noopener noreferrer" title="হোয়াটসঅ্যাপে যোগাযোগ করুন" class="bg-emerald-600/95 hover:bg-emerald-500 text-white border-2 border-yellow-300 px-2.5 h-10 sm:h-11 rounded-xl flex items-center justify-center gap-1.5 shadow-lg active:scale-95 font-bold text-xs sm:text-sm">
+                    <i class="fa-brands fa-whatsapp text-lg"></i>
+                    <span class="hidden md:inline">ওয়েবসাইট / মার্কেটিং সেবা</span>
+                </a>
+                <button id="weatherBtn" title="আবহাওয়া পরিবর্তন (Rain/Day/Night)" class="bg-slate-900/90 hover:bg-slate-800 text-sky-300 border-2 border-sky-400 w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center shadow-lg active:scale-95">
+                    <i class="fa-solid fa-cloud-sun-rain text-lg"></i>
+                </button>
+                <button id="headlightBtn" title="হেডলাইট (L)" class="bg-slate-900/90 hover:bg-slate-800 text-yellow-300 border-2 border-yellow-400 w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center shadow-lg active:scale-95">
+                    <i class="fa-solid fa-lightbulb text-lg"></i>
+                </button>
+                <button id="soundBtn" title="সাউন্ড অন/অফ" class="bg-slate-900/90 hover:bg-slate-800 text-emerald-300 border-2 border-emerald-400 w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center shadow-lg active:scale-95">
+                    <i id="soundIcon" class="fa-solid fa-volume-high text-lg"></i>
+                </button>
+                <button id="pauseBtn" title="মেনু / বিরতি" class="bg-red-700/90 hover:bg-red-600 text-white border-2 border-yellow-300 w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center shadow-lg active:scale-95">
+                    <i class="fa-solid fa-pause text-lg"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Warning / Event Toast Banner -->
+        <div id="eventBanner" class="hidden self-center mt-1 bg-gradient-to-r from-red-700 via-amber-600 to-red-700 text-white px-5 py-1.5 rounded-full border-2 border-yellow-300 font-bold text-xs sm:text-sm shadow-2xl animate-bounce pointer-events-auto">
+            ⚠️ সামনে গতিরোধক (Speedbreaker)! ধীরে চালান!
+        </div>
+
+        <!-- Interactive Billboard Ad Toast (Appears when driving near a Mega Billboard) -->
+        <div id="billboardToast" class="hidden self-center mt-1 bg-slate-950/95 text-white px-4 py-2 rounded-2xl border-2 border-emerald-400 shadow-2xl flex items-center gap-3 pointer-events-auto transition-all">
+            <div class="w-9 h-9 rounded-xl bg-emerald-600 flex items-center justify-center text-white text-xl shrink-0">
+                <i class="fa-brands fa-whatsapp"></i>
+            </div>
+            <div class="text-xs sm:text-sm">
+                <div id="bbToastTitle" class="font-bold text-yellow-300">আপনার ব্যবসার জন্য প্রফেশনাল ওয়েবসাইট দরকার?</div>
+                <div class="text-[11px] text-slate-300">হোয়াটসঅ্যাপ: <span class="text-emerald-400 font-bold">+৮৮০ ১৫১৬-৫১৪২১৬</span> (বিলবোর্ডে বা পাশে ক্লিক করুন)</div>
+            </div>
+            <a href="https://wa.me/+8801516514216" target="_blank" rel="noopener noreferrer" class="truck-btn-green text-white font-bold text-xs px-3 py-1.5 rounded-xl flex items-center gap-1 shrink-0">
+                <span>চ্যাট করুন</span> <i class="fa-solid fa-arrow-up-right-from-square text-[10px]"></i>
+            </a>
+        </div>
+    </div>
+
+    <!-- TOLL PLAZA / CHECKPOINT INTERACTIVE POPUP -->
+    <div id="checkpointModal" class="hidden absolute inset-x-0 top-28 flex justify-center z-30 pointer-events-none px-4">
+        <div class="bg-slate-900/95 border-4 border-yellow-400 rounded-2xl p-4 max-w-md w-full text-center shadow-2xl pointer-events-auto">
+            <div class="text-amber-400 font-bold text-lg sm:text-xl flex items-center justify-center gap-2">
+                <i class="fa-solid fa-road-barrier text-red-500"></i>
+                <span id="cpTitle">পদ্মা সেতু টোল প্লাজা!</span>
+            </div>
+            <p id="cpDesc" class="text-slate-200 text-xs sm:text-sm my-2">সেতু পারাপারের জন্য সরকারি টোল প্রদান করুন অথবা ব্যারিয়ার খুলে যাবে।</p>
+            <div class="flex justify-center gap-3 mt-3">
+                <button id="payTollBtn" class="truck-btn-green text-white font-bold px-4 py-2 rounded-xl text-sm flex items-center gap-2">
+                    <i class="fa-solid fa-money-bill-wave"></i> টোল দিন (৳ ১০০)
+                </button>
+                <button id="hornPassBtn" class="truck-btn text-slate-950 font-bold px-4 py-2 rounded-xl text-sm flex items-center gap-2">
+                    <i class="fa-solid fa-bullhorn"></i> ভিআইপি হর্ন বাজান!
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ON-SCREEN TOUCH / MOUSE CONTROLS (Bottom) -->
+    <div id="touchControls" class="hidden absolute bottom-3 left-0 w-full px-3 sm:px-8 flex justify-between items-end z-20 pointer-events-none">
+        <!-- Left Side: Tilt & Musical Horn -->
+        <div class="flex items-end gap-2 sm:gap-3 pointer-events-auto">
+            <button id="btnTiltLeft" class="pedal-btn w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-slate-900/80 border-2 border-amber-400 text-amber-300 flex flex-col items-center justify-center shadow-xl">
+                <i class="fa-solid fa-rotate-left text-xl"></i>
+                <span class="text-[10px] font-bold mt-0.5">ব্যালেন্স ◀</span>
+            </button>
+            <button id="btnTiltRight" class="pedal-btn w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-slate-900/80 border-2 border-amber-400 text-amber-300 flex flex-col items-center justify-center shadow-xl">
+                <i class="fa-solid fa-rotate-right text-xl"></i>
+                <span class="text-[10px] font-bold mt-0.5">ব্যালেন্স ▶</span>
+            </button>
+            <button id="btnHorn" class="pedal-btn w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-b from-pink-500 to-rose-700 border-2 border-yellow-300 text-white flex flex-col items-center justify-center shadow-xl">
+                <i class="fa-solid fa-bullhorn text-xl"></i>
+                <span class="text-[10px] font-bold mt-0.5">পোঁ-পোঁ (H)</span>
+            </button>
+        </div>
+
+        <!-- Right Side: Brake & Accelerator Pedals -->
+        <div class="flex items-end gap-3 sm:gap-4 pointer-events-auto">
+            <button id="btnBrake" class="pedal-btn w-16 h-20 sm:w-20 sm:h-24 rounded-2xl bg-gradient-to-b from-red-600/90 to-red-900/90 border-2 border-red-300 text-white flex flex-col items-center justify-between py-2.5 shadow-2xl">
+                <span class="text-[11px] font-bold tracking-wider">ব্রেক</span>
+                <i class="fa-solid fa-hand-paper text-2xl"></i>
+                <span class="text-[9px] text-red-200">BRAKE</span>
+            </button>
+            <button id="btnGas" class="pedal-btn w-20 h-28 sm:w-24 sm:h-32 rounded-2xl bg-gradient-to-b from-emerald-500/90 to-emerald-800/90 border-2 border-yellow-300 text-white flex flex-col items-center justify-between py-3 shadow-2xl">
+                <span class="text-xs font-bold tracking-wider text-yellow-200">পিকআপ</span>
+                <i class="fa-solid fa-angles-up text-3xl animate-pulse"></i>
+                <span class="text-[10px] font-semibold">GAS (▶)</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- MAIN MENU & GARAGE MODAL -->
+    <div id="mainMenu" class="absolute inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-6 z-40 overflow-y-auto">
+        <div class="truck-art-border rounded-3xl max-w-4xl w-full p-4 sm:p-7 text-white relative my-auto">
+            
+            <!-- Decorative Corner Floral Motifs -->
+            <div class="flex flex-col md:flex-row justify-between items-center gap-4 border-b-2 border-yellow-500/40 pb-4">
+                <div class="flex items-center gap-3 sm:gap-4">
+                    <div class="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-red-600 via-amber-500 to-green-600 p-1 shadow-lg flex items-center justify-center border-2 border-yellow-300 animate-float">
+                        <i class="fa-solid fa-truck-Ramp-Box text-2xl sm:text-3xl text-white"></i>
+                    </div>
+                    <div>
+                        <div class="flex items-center gap-2">
+                            <span class="bg-red-600 text-yellow-200 text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-full border border-yellow-300">মায়ের দোয়া পরিবহন</span>
+                            <span class="bg-green-700 text-white text-[10px] sm:text-xs font-bold px-2 py-0.5 rounded-full">BD 2D PHYSICS</span>
+                        </div>
+                        <h1 class="font-display text-3xl sm:text-5xl font-bold tracking-wide text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-amber-400 to-emerald-400 drop-shadow">
+                            DHAKA DELIVERY EXPRESS
+                        </h1>
+                        <p class="text-xs sm:text-sm text-amber-200/90 -mt-1">ঢাকা ডেলিভারি এক্সপ্রেস — বাংলার হাইওয়ে ও কার্গো সিমুলেটর</p>
+                    </div>
+                </div>
+
+                <!-- Player Bank Balance -->
+                <div class="bg-slate-900 border-2 border-emerald-400 rounded-2xl px-4 py-2 flex items-center gap-3 shadow-inner">
+                    <div class="w-10 h-10 rounded-full bg-emerald-600/30 border border-emerald-400 flex items-center justify-center text-emerald-300 text-xl font-bold">৳</div>
+                    <div>
+                        <div class="text-[11px] text-slate-400">মোট জমা (Balance)</div>
+                        <div id="menuTaka" class="text-xl sm:text-2xl font-bold text-emerald-400">৳ 1,500</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Main Content Grid: Route Selection & Garage Upgrades -->
+            <div class="grid grid-cols-1 lg:grid-cols-12 gap-5 mt-5">
+                
+                <!-- Left Column: Route / Level Selection (7 cols) -->
+                <div class="lg:col-span-7 flex flex-col gap-3">
+                    <h2 class="text-base sm:text-lg font-bold text-yellow-300 flex items-center gap-2">
+                        <i class="fa-solid fa-map-location-dot text-red-400"></i> ডেলিভারি রুট নির্বাচন করুন (Select Route)
+                    </h2>
+
+                    <div id="levelList" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        <!-- Dynamically Populated Level Cards -->
+                    </div>
+
+                    <!-- Cargo Type Preview -->
+                    <div class="bg-slate-900/90 border border-amber-500/40 rounded-2xl p-3 mt-1 flex flex-wrap items-center justify-between gap-2">
+                        <div class="flex items-center gap-2.5">
+                            <i class="fa-solid fa-dolly text-2xl text-amber-400"></i>
+                            <div>
+                                <div class="text-xs text-slate-300 font-semibold">আজকের ডেলিভারি মালপত্র (Cargo Load):</div>
+                                <div class="text-xs text-amber-300 font-bold">রাজশাহীর আম, চালের বস্তা, ইলেকট্রনিক্স ও ক্যারেট</div>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <label class="text-xs text-slate-300">মালের সংখ্যা:</label>
+                            <select id="cargoQtySelect" class="bg-slate-800 border border-amber-400 rounded-lg px-2.5 py-1 text-xs font-bold text-yellow-300">
+                                <option value="6">৬ টি (হালকা - সহজ)</option>
+                                <option value="8" selected>৮ টি (মাঝারি - বোনাস ১.২x)</option>
+                                <option value="11">১১ টি (ওভারলোড! বোনাস ১.৬x)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Column: Truck Garage & Customization (5 cols) -->
+                <div class="lg:col-span-5 bg-slate-900/90 border-2 border-amber-500/50 rounded-2xl p-3.5 flex flex-col justify-between gap-3">
+                    <div>
+                        <div class="flex items-center justify-between border-b border-slate-700 pb-2 mb-3">
+                            <h2 class="text-base font-bold text-amber-300 flex items-center gap-2">
+                                <i class="fa-solid fa-screwdriver-wrench text-emerald-400"></i> ধোলাইখাল গ্যারেজ ও আপগ্রেড
+                            </h2>
+                            <button id="paintColorBtn" class="text-xs bg-pink-600 hover:bg-pink-500 text-white px-2.5 py-1 rounded-lg border border-yellow-300 font-bold flex items-center gap-1">
+                                <i class="fa-solid fa-palette"></i> রঙ বদলান
+                            </button>
+                        </div>
+
+                        <!-- Truck Slogan Selector -->
+                        <div class="mb-3 flex items-center justify-between bg-slate-800/90 px-3 py-1.5 rounded-xl border border-slate-700">
+                            <span class="text-xs text-slate-300">ট্রাকের স্লোগান:</span>
+                            <select id="sloganSelect" class="bg-slate-900 text-yellow-300 text-xs font-bold px-2 py-1 rounded border border-yellow-500/50">
+                                <option value="মায়ের দোয়া">মায়ের দোয়া পরিবহন</option>
+                                <option value="আল্লাহ ভরসা">আল্লাহ ভরসা এক্সপ্রেস</option>
+                                <option value="হিংসা করো না">হিংসা করো না, চেষ্টা করো</option>
+                                <option value="সময়ের চেয়ে জীবনের মূল্য বেশি">সময়ের চেয়ে জীবনের মূল্য বেশি</option>
+                            </select>
+                        </div>
+
+                        <!-- Upgrade Items -->
+                        <div class="flex flex-col gap-2.5" id="upgradeContainer">
+                            <!-- Engine -->
+                            <div class="bg-slate-800/80 p-2.5 rounded-xl border border-slate-700 flex items-center justify-between">
+                                <div>
+                                    <div class="text-xs sm:text-sm font-bold text-white flex items-center gap-1.5">
+                                        <i class="fa-solid fa-bolt text-yellow-400"></i> টার্বো ইঞ্জিন (Engine)
+                                    </div>
+                                    <div id="upgEngineLvl" class="text-[11px] text-emerald-400 font-semibold">লেভেল ১ / ৫</div>
+                                </div>
+                                <button onclick="buyUpgrade('engine')" id="btnUpgEngine" class="truck-btn text-slate-950 font-bold text-xs px-3 py-1.5 rounded-lg">
+                                    ৳ ৪০০
+                                </button>
+                            </div>
+
+                            <!-- Suspension -->
+                            <div class="bg-slate-800/80 p-2.5 rounded-xl border border-slate-700 flex items-center justify-between">
+                                <div>
+                                    <div class="text-xs sm:text-sm font-bold text-white flex items-center gap-1.5">
+                                        <i class="fa-solid fa-compress-arrows-alt text-sky-400"></i> পাতি স্প্রিং সাসপেনশন
+                                    </div>
+                                    <div id="upgSuspLvl" class="text-[11px] text-emerald-400 font-semibold">লেভেল ১ / ৫</div>
+                                </div>
+                                <button onclick="buyUpgrade('suspension')" id="btnUpgSusp" class="truck-btn text-slate-950 font-bold text-xs px-3 py-1.5 rounded-lg">
+                                    ৳ ৪০০
+                                </button>
+                            </div>
+
+                            <!-- Tires & Grip -->
+                            <div class="bg-slate-800/80 p-2.5 rounded-xl border border-slate-700 flex items-center justify-between">
+                                <div>
+                                    <div class="text-xs sm:text-sm font-bold text-white flex items-center gap-1.5">
+                                        <i class="fa-solid fa-circle-dot text-orange-400"></i> হেভি ডিউটি চাকা (Tires)
+                                    </div>
+                                    <div id="upgTireLvl" class="text-[11px] text-emerald-400 font-semibold">লেভেল ১ / ৫</div>
+                                </div>
+                                <button onclick="buyUpgrade('tires')" id="btnUpgTire" class="truck-btn text-slate-950 font-bold text-xs px-3 py-1.5 rounded-lg">
+                                    ৳ ৪০০
+                                </button>
+                            </div>
+
+                            <!-- Fuel Tank -->
+                            <div class="bg-slate-800/80 p-2.5 rounded-xl border border-slate-700 flex items-center justify-between">
+                                <div>
+                                    <div class="text-xs sm:text-sm font-bold text-white flex items-center gap-1.5">
+                                        <i class="fa-solid fa-gas-pump text-pink-400"></i> রিজার্ভ ফুয়েল ট্যাংক
+                                    </div>
+                                    <div id="upgFuelLvl" class="text-[11px] text-emerald-400 font-semibold">লেভেল ১ / ৫</div>
+                                </div>
+                                <button onclick="buyUpgrade('fuel')" id="btnUpgFuel" class="truck-btn text-slate-950 font-bold text-xs px-3 py-1.5 rounded-lg">
+                                    ৳ ৪০০
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Controls Instruction Box -->
+                    <div class="bg-slate-950/80 border border-slate-800 rounded-xl p-2.5 text-[11px] text-slate-300 flex flex-col gap-1">
+                        <div class="text-amber-300 font-bold"><i class="fa-solid fa-gamepad mr-1"></i> খেলার নিয়ম (Controls):</div>
+                        <div>• <b>ডান/বাম অ্যারো বা A/D:</b> পিকআপ ও ব্রেক/রিভার্স</div>
+                        <div>• <b>উপর/নিচ অ্যারো বা W/S:</b> ট্রাকের ব্যালেন্স (Tilt)</div>
+                        <div>• <b>H:</b> মিউজিক্যাল ট্রাক হর্ন | <b>L:</b> হেডলাইট অন/অফ</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Start Game CTA -->
+            <div class="mt-5 flex flex-col sm:flex-row justify-between items-center gap-3 pt-3 border-t border-slate-800">
+                <div class="flex flex-col gap-1">
+                    <div id="menuStatusMsg" class="text-xs sm:text-sm text-amber-300 font-semibold">
+                        💡 টিপস: স্পিডব্রেকার ও ভাঙা রাস্তায় ধীরে চালালে বস্তা ও আমের ক্যারেট পড়বে না!
+                    </div>
+                    <a href="https://wa.me/+8801516514216" target="_blank" rel="noopener noreferrer" class="inline-flex items-center gap-2 text-xs text-emerald-400 hover:text-emerald-300 font-bold underline">
+                        <i class="fa-brands fa-whatsapp text-sm"></i> ওয়েবসাইট, ই-কমার্স, অনলাইন শপ ও ডিজিটাল মার্কেটিং পেতে যোগাযোগ: wa.me/+8801516514216
+                    </a>
+                </div>
+                <button id="startTripBtn" class="truck-btn-green text-white font-bold text-lg sm:text-xl px-8 py-3 rounded-2xl w-full sm:w-auto flex items-center justify-center gap-3 cursor-pointer">
+                    <i class="fa-solid fa-play"></i> বিসমিল্লাহ বলে যাত্রা শুরু করুন!
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- END OF LEVEL / RESULT MODAL -->
+    <div id="resultModal" class="hidden absolute inset-0 bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-4 z-50">
+        <div class="truck-art-border rounded-3xl max-w-md w-full p-6 text-white text-center flex flex-col gap-4">
+            <div id="resultIcon" class="w-20 h-20 rounded-full bg-emerald-600/30 border-4 border-emerald-400 mx-auto flex items-center justify-center text-4xl text-emerald-300">
+                <i class="fa-solid fa-trophy"></i>
+            </div>
+            <h2 id="resultTitle" class="text-2xl sm:text-3xl font-bold text-yellow-300">ডেলিভারি সফল হয়েছে!</h2>
+            <p id="resultSubtitle" class="text-xs sm:text-sm text-slate-300 -mt-2">মহাজন আপনার ড্রাইভিং দেখে খুশি হয়েছেন!</p>
+
+            <div class="bg-slate-900/90 border border-amber-500/40 rounded-2xl p-4 flex flex-col gap-2 text-sm">
+                <div class="flex justify-between">
+                    <span class="text-slate-400">অতিক্রান্ত দূরত্ব:</span>
+                    <span id="resDistance" class="font-bold text-white">1800m</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-slate-400">সুরক্ষিত মালপত্র (Cargo Saved):</span>
+                    <span id="resCargo" class="font-bold text-amber-300">7 / 8 টি</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-slate-400">ডেলিভারি ভাড়া (Base Pay):</span>
+                    <span id="resBasePay" class="font-bold text-emerald-300">+ ৳ ৭০০</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-slate-400">সময় ও দক্ষতা বোনাস (Bonus):</span>
+                    <span id="resBonus" class="font-bold text-sky-300">+ ৳ ২৫০</span>
+                </div>
+                <div class="border-t border-slate-700 pt-2 mt-1 flex justify-between text-base font-bold">
+                    <span class="text-yellow-300">মোট আয় (Total Earned):</span>
+                    <span id="resTotalEarned" class="text-emerald-400 text-lg">৳ ৯৫০</span>
+                </div>
+            </div>
+
+            <div class="flex gap-3 mt-2">
+                <button id="btnRetry" class="truck-btn text-slate-950 font-bold flex-1 py-3 rounded-xl text-sm sm:text-base flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-rotate-right"></i> আবার চালান
+                </button>
+                <button id="btnBackGarage" class="truck-btn-green text-white font-bold flex-1 py-3 rounded-xl text-sm sm:text-base flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-warehouse"></i> গ্যারেজ ও মেনু
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        /********************************************************************
+         * DHAKA DELIVERY EXPRESS - 2D PHYSICS TRUCK & CARGO SIMULATOR
+         * Complete Custom Physics Engine, Procedural Terrain, Rickshaw Art,
+         * Web Audio Musical Horn & Engine Synthesizer
+         ********************************************************************/
+
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Responsive Canvas Sizing
+        let W = window.innerWidth;
+        let H = window.innerHeight;
+        function resizeCanvas() {
+            W = window.innerWidth;
+            H = window.innerHeight;
+            canvas.width = W;
+            canvas.height = H;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        // ==================== WEB AUDIO SYNTHESIZER ====================
+        class SoundSystem {
+            constructor() {
+                this.ctx = null;
+                this.muted = false;
+                this.engineOsc = null;
+                this.engineGain = null;
+                this.isPlayingHorn = false;
+            }
+
+            init() {
+                if (this.ctx) return;
+                const AudioCtx = window.AudioContext || window.webkitAudioContext;
+                if (!AudioCtx) return;
+                this.ctx = new AudioCtx();
+
+                // Continuous Truck Diesel Engine Rumble
+                this.engineOsc = this.ctx.createOscillator();
+                this.engineGain = this.ctx.createGain();
+                this.engineOsc.type = 'sawtooth';
+                this.engineOsc.frequency.value = 42;
+                this.engineGain.gain.value = 0.0;
+
+                // Lowpass filter to warm the engine sound
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.value = 160;
+
+                this.engineOsc.connect(filter);
+                filter.connect(this.engineGain);
+                this.engineGain.connect(this.ctx.destination);
+                this.engineOsc.start();
+            }
+
+            updateEngine(speedRatio, isGasPressed, active) {
+                if (!this.ctx || this.muted || !active) {
+                    if (this.engineGain) this.engineGain.gain.setTargetAtTime(0, this.ctx ? this.ctx.currentTime : 0, 0.1);
+                    return;
+                }
+                if (this.ctx.state === 'suspended') this.ctx.resume();
+                const baseFreq = 38 + Math.abs(speedRatio) * 65 + (isGasPressed ? 18 : 0);
+                const jitter = Math.sin(performance.now() * 0.04) * 3;
+                this.engineOsc.frequency.setTargetAtTime(baseFreq + jitter, this.ctx.currentTime, 0.06);
+                const targetVol = isGasPressed ? 0.08 : 0.035;
+                this.engineGain.gain.setTargetAtTime(targetVol, this.ctx.currentTime, 0.08);
+            }
+
+            // Famous Bangladeshi Musical Truck Horn ("Pom-Pom-Peee-Pom!")
+            playMusicalHorn() {
+                if (this.muted) return;
+                this.init();
+                if (!this.ctx || this.isPlayingHorn) return;
+                if (this.ctx.state === 'suspended') this.ctx.resume();
+
+                this.isPlayingHorn = true;
+                const notes = [523.25, 659.25, 783.99, 659.25, 880.00, 783.99]; // C5, E5, G5, E5, A5, G5
+                const durations = [0.13, 0.13, 0.18, 0.12, 0.22, 0.28];
+                let startTime = this.ctx.currentTime;
+
+                notes.forEach((freq, idx) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'square';
+                    osc.frequency.setValueAtTime(freq, startTime);
+
+                    gain.gain.setValueAtTime(0.001, startTime);
+                    gain.gain.exponentialRampToValueAtTime(0.11, startTime + 0.02);
+                    gain.gain.exponentialRampToValueAtTime(0.001, startTime + durations[idx] - 0.02);
+
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+
+                    osc.start(startTime);
+                    osc.stop(startTime + durations[idx]);
+                    startTime += durations[idx] + 0.02;
+                });
+
+                setTimeout(() => { this.isPlayingHorn = false; }, 1150);
+            }
+
+            playThud(intensity = 1) {
+                if (this.muted || !this.ctx) return;
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'triangle';
+                const now = this.ctx.currentTime;
+                osc.frequency.setValueAtTime(110 * intensity, now);
+                osc.frequency.exponentialRampToValueAtTime(28, now + 0.18);
+
+                gain.gain.setValueAtTime(Math.min(0.2, 0.08 * intensity), now);
+                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start(now);
+                osc.stop(now + 0.19);
+            }
+
+            playCash() {
+                if (this.muted) return;
+                this.init();
+                if (!this.ctx) return;
+                const now = this.ctx.currentTime;
+                [987.77, 1318.51].forEach((f, i) => {
+                    const osc = this.ctx.createOscillator();
+                    const gain = this.ctx.createGain();
+                    osc.type = 'sine';
+                    osc.frequency.setValueAtTime(f, now + i * 0.09);
+                    gain.gain.setValueAtTime(0.12, now + i * 0.09);
+                    gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.09 + 0.25);
+                    osc.connect(gain);
+                    gain.connect(this.ctx.destination);
+                    osc.start(now + i * 0.09);
+                    osc.stop(now + i * 0.09 + 0.26);
+                });
+            }
+        }
+
+        const sound = new SoundSystem();
+
+        // ==================== PLAYER SAVE & LEVEL DATA ====================
+        const LEVELS = [
+            {
+                id: 0,
+                name: 'ঢাকা ➔ মাওয়া এক্সপ্রেসওয়ে',
+                subtitle: 'ফ্লাইওভার, টং দোকান ও পদ্মা সেতু টোল প্লাজা',
+                distance: 1800,
+                baseReward: 120,
+                roughness: 0.7,
+                speedbreakers: 7,
+                potholes: 5,
+                bridges: 2,
+                weather: 'day',
+                skyTop: '#0284c7',
+                skyBot: '#bae6fd'
+            },
+            {
+                id: 1,
+                name: 'কাঁচপুর ➔ মেঘনা ব্রিজ হাইওয়ে',
+                subtitle: 'উঁচু সেতু, ব্যস্ত সিএনজি ও ভাঙা রাস্তা',
+                distance: 2300,
+                baseReward: 155,
+                roughness: 1.0,
+                speedbreakers: 10,
+                potholes: 8,
+                bridges: 3,
+                weather: 'sunset',
+                skyTop: '#311042',
+                skyBot: '#f97316'
+            },
+            {
+                id: 2,
+                name: 'টাঙ্গাইল ➔ যমুনা সেতু (বৃষ্টি)',
+                subtitle: 'কালবৈশাখী বৃষ্টি, পিচ্ছিল পথ ও গভীর গর্ত',
+                distance: 2600,
+                baseReward: 190,
+                roughness: 1.25,
+                speedbreakers: 11,
+                potholes: 11,
+                bridges: 3,
+                weather: 'rain',
+                skyTop: '#0f172a',
+                skyBot: '#334155'
+            },
+            {
+                id: 3,
+                name: 'চট্টগ্রাম পাহাড়ি ঢাল (রাতের ট্রিপ)',
+                subtitle: 'খাড়া পাহাড়ি রাস্তা, হেডলাইট ও কঠিন চ্যালেঞ্জ',
+                distance: 3000,
+                baseReward: 240,
+                roughness: 1.5,
+                speedbreakers: 13,
+                potholes: 13,
+                bridges: 4,
+                weather: 'night',
+                skyTop: '#020617',
+                skyBot: '#1e1b4b'
+            }
+        ];
+
+        const TRUCK_PALETTES = [
+            { name: 'হলুদ-লাল (Traditional)', body: '#eab308', cabin: '#dc2626', trim: '#16a34a', rim: '#facc15' },
+            { name: 'সবুজ-সোনালী (Bangla Green)', body: '#16a34a', cabin: '#ca8a04', trim: '#dc2626', rim: '#fde047' },
+            { name: 'নীল-গোলাপী (Royal Express)', body: '#2563eb', cabin: '#db2777', trim: '#facc15', rim: '#38bdf8' },
+            { name: 'কমলা-বেগুনি (Chittagong King)', body: '#ea580c', cabin: '#7c3aed', trim: '#22c55e', rim: '#fDBA74' }
+        ];
+
+        let playerData = {
+            taka: 1500,
+            selectedLevel: 0,
+            paletteIdx: 0,
+            slogan: 'মায়ের দোয়া',
+            cargoCount: 8,
+            upgrades: {
+                engine: 1,
+                suspension: 1,
+                tires: 1,
+                fuel: 1
+            }
+        };
+
+        // Load saved progress safely
+        try {
+            const saved = localStorage.getItem('dhaka_delivery_save_v1');
+            if (saved) {
+                const parsed = JSON.parse(saved);
+                playerData = { ...playerData, ...parsed, upgrades: { ...playerData.upgrades, ...(parsed.upgrades || {}) } };
+            }
+        } catch (e) {}
+
+        function saveProgress() {
+            try {
+                localStorage.setItem('dhaka_delivery_save_v1', JSON.stringify(playerData));
+            } catch (e) {}
+        }
+
+        // ==================== GAME STATE & WORLD OBJECTS ====================
+        let gameState = 'MENU'; // MENU, PLAYING, PAUSED, RESULT
+        let currentLevel = LEVELS[0];
+        let weatherMode = 'day'; // day, sunset, rain, night
+        let headlightsOn = false;
+
+        // Controls Input
+        const keys = { right: false, left: false, up: false, down: false };
+
+        // Camera & Terrain
+        let camX = 0;
+        let camY = 0;
+        const STEP = 30; // Horizontal terrain vertex spacing in pixels
+        const PIXELS_PER_METER = 18;
+        let terrainPts = [];
+        let roadFeatures = []; // speedbreakers, potholes, bridges, tolls, teaStalls
+        let bgDecors = [];     // trees, buildings, rickshaws, pillars
+        let particles = [];
+        let raindrops = [];
+        let floatingTexts = [];
+        let clickableBillboardBounds = []; // Screen-space bounding boxes for clicking billboards on canvas
+
+        // Physics Truck & Cargo
+        let truck = null;
+        let cargoItems = [];
+        let startTime = 0;
+        let elapsedSeconds = 0;
+        let activeToll = null;
+
+        // ==================== TERRAIN & ROAD GENERATOR ====================
+        function generateWorld(level) {
+            terrainPts = [];
+            roadFeatures = [];
+            bgDecors = [];
+            particles = [];
+            floatingTexts = [];
+            activeToll = null;
+
+            const totalPx = level.distance * PIXELS_PER_METER + 3000;
+            const totalSteps = Math.ceil(totalPx / STEP);
+
+            // Generate smooth base hills + flat start/finish zones
+            for (let i = -30; i <= totalSteps; i++) {
+                const x = i * STEP;
+                let y = 0;
+                if (x > 650 && x < level.distance * PIXELS_PER_METER - 600) {
+                    const r = level.roughness;
+                    y = Math.sin(i * 0.035) * 65 * r
+                      + Math.sin(i * 0.09) * 28 * r
+                      + Math.cos(i * 0.018) * 90 * r;
+                }
+                terrainPts.push({ x, y, type: 'normal' });
+            }
+
+            // Inject Bridges (Padma/Meghna style arched spans)
+            const bridgeSpacing = (level.distance * PIXELS_PER_METER - 2200) / (level.bridges + 1);
+            for (let b = 1; b <= level.bridges; b++) {
+                const centerIdx = Math.floor((1100 + b * bridgeSpacing) / STEP);
+                const spanSteps = 28;
+                for (let k = -spanSteps; k <= spanSteps; k++) {
+                    const idx = centerIdx + k + 30;
+                    if (terrainPts[idx]) {
+                        const norm = k / spanSteps; // -1 to 1
+                        const archElevation = Math.cos(norm * Math.PI * 0.5) * 145;
+                        terrainPts[idx].y -= archElevation;
+                        terrainPts[idx].type = 'bridge';
+                    }
+                }
+                roadFeatures.push({
+                    type: 'bridge',
+                    x: (centerIdx - spanSteps) * STEP,
+                    endX: (centerIdx + spanSteps) * STEP,
+                    name: b % 2 === 1 ? 'পদ্মা সেতু স্প্যান' : 'মেঘনা সেতু'
+                });
+
+                // Place a Toll Plaza right before the first bridge
+                if (b === 1) {
+                    const tollX = (centerIdx - spanSteps - 10) * STEP;
+                    // Flatten road around toll plaza
+                    const tollCenterIdx = centerIdx - spanSteps - 10 + 30;
+                    const baseTollY = terrainPts[tollCenterIdx] ? terrainPts[tollCenterIdx].y : 0;
+                    for (let t = -8; t <= 8; t++) {
+                        if (terrainPts[tollCenterIdx + t]) terrainPts[tollCenterIdx + t].y = baseTollY;
+                    }
+                    roadFeatures.push({
+                        type: 'toll',
+                        x: tollX,
+                        y: baseTollY,
+                        gateOpen: false,
+                        resolved: false
+                    });
+                }
+            }
+
+            // Inject Speedbreakers (গতিরোধক)
+            for (let s = 0; s < level.speedbreakers; s++) {
+                const frac = (s + 1) / (level.speedbreakers + 1);
+                const sbX = 900 + frac * (level.distance * PIXELS_PER_METER - 1800) + (Math.random() - 0.5) * 350;
+                const idx = Math.floor(sbX / STEP) + 30;
+                if (terrainPts[idx] && terrainPts[idx].type === 'normal') {
+                    // Avoid placing right on toll
+                    const nearToll = roadFeatures.some(f => f.type === 'toll' && Math.abs(f.x - sbX) < 400);
+                    if (!nearToll) {
+                        roadFeatures.push({
+                            type: 'speedbreaker',
+                            x: terrainPts[idx].x,
+                            radius: 24,
+                            height: 15
+                        });
+                    }
+                }
+            }
+
+            // Inject Potholes (ভাঙা রাস্তা / গর্ত)
+            for (let p = 0; p < level.potholes; p++) {
+                const frac = (p + 0.5) / (level.potholes + 1);
+                const phX = 1200 + frac * (level.distance * PIXELS_PER_METER - 2000) + (Math.random() - 0.5) * 300;
+                const idx = Math.floor(phX / STEP) + 30;
+                if (terrainPts[idx] && terrainPts[idx].type === 'normal') {
+                    terrainPts[idx].y += 22; // Dip in road
+                    terrainPts[idx].type = 'pothole';
+                    roadFeatures.push({
+                        type: 'pothole',
+                        x: terrainPts[idx].x,
+                        width: 55
+                    });
+                }
+            }
+
+            // Populate Roadside Scenery + Randomly Placed Highway Billboards Along Entire Route
+            const billboardTypes = ['website', 'marketing', 'onlineshop', 'ecommerce', 'google'];
+            const mountStyles = ['gantry', 'unipole', 'double_pillar'];
+            let shuffledBag = [];
+            let lastPickedAd = null;
+
+            function getNextRandomAdType() {
+                if (shuffledBag.length === 0) {
+                    shuffledBag = [...billboardTypes];
+                    for (let i = shuffledBag.length - 1; i > 0; i--) {
+                        const j = Math.floor(Math.random() * (i + 1));
+                        [shuffledBag[i], shuffledBag[j]] = [shuffledBag[j], shuffledBag[i]];
+                    }
+                    // Ensure no back-to-back duplicate ad across bag boundaries
+                    if (shuffledBag[shuffledBag.length - 1] === lastPickedAd && shuffledBag.length > 1) {
+                        [shuffledBag[0], shuffledBag[shuffledBag.length - 1]] = [shuffledBag[shuffledBag.length - 1], shuffledBag[0]];
+                    }
+                }
+                lastPickedAd = shuffledBag.pop();
+                return lastPickedAd;
+            }
+
+            const maxWorldX = level.distance * PIXELS_PER_METER + 2800;
+
+            // 1. Spawn Billboards at Randomized Wider Intervals Along the Entire Road
+            let nextBillboardX = 850 + Math.floor(Math.random() * 450);
+            while (nextBillboardX < maxWorldX) {
+                // Avoid overlapping directly with Toll Plazas
+                const nearToll = roadFeatures.some(f => f.type === 'toll' && Math.abs(f.x - nextBillboardX) < 380);
+                if (nearToll) {
+                    nextBillboardX += 550;
+                    continue;
+                }
+
+                const groundY = getRoadHeight(nextBillboardX);
+                const mountStyle = mountStyles[Math.floor(Math.random() * mountStyles.length)];
+                const tiltAngle = (Math.random() - 0.5) * 0.025; // Subtle realistic perspective variation
+                const heightOffset = Math.floor(Math.random() * 28); // Slight random elevation
+
+                bgDecors.push({
+                    type: 'mega_billboard',
+                    adType: getNextRandomAdType(),
+                    mountStyle,
+                    tiltAngle,
+                    heightOffset,
+                    x: nextBillboardX,
+                    y: groundY
+                });
+
+                // Increased randomized spacing between billboards (approx 1600px to 2700px apart along the highway)
+                nextBillboardX += 1600 + Math.floor(Math.random() * 1100);
+            }
+
+            // 2. Populate Natural Bangladeshi Scenery (Tong Tea Stalls, Banyan Trees, Buildings) Between Billboards
+            for (let x = 220; x < maxWorldX; x += 210 + Math.floor(Math.random() * 110)) {
+                const tooCloseToBillboard = bgDecors.some(d => d.type === 'mega_billboard' && Math.abs(d.x - x) < 260);
+                if (tooCloseToBillboard) continue;
+
+                const groundY = getRoadHeight(x);
+                const rand = Math.random();
+                if (rand < 0.34) {
+                    bgDecors.push({ type: 'tea_stall', x, y: groundY });
+                } else if (rand < 0.70) {
+                    bgDecors.push({ type: 'banyan_tree', x, y: groundY, scale: 0.82 + Math.random() * 0.45 });
+                } else {
+                    bgDecors.push({
+                        type: 'building',
+                        x,
+                        y: groundY,
+                        floors: 2 + Math.floor(Math.random() * 4),
+                        color: ['#cbd5e1', '#fed7aa', '#bbf7d0', '#fecdd3'][Math.floor(Math.random() * 4)]
+                    });
+                }
+            }
+
+            // Sort scenery by X for clean rendering order
+            bgDecors.sort((a, b) => a.x - b.x);
+        }
+
+        // Exact road height at any world X coordinate (including speedbreakers)
+        function getRoadHeight(worldX) {
+            const idxFloat = worldX / STEP + 30;
+            const idx = Math.floor(idxFloat);
+            const t = idxFloat - idx;
+
+            let baseY = 0;
+            if (idx >= 0 && idx < terrainPts.length - 1) {
+                baseY = terrainPts[idx].y * (1 - t) + terrainPts[idx + 1].y * t;
+            }
+
+            // Add Speedbreaker bump curve
+            for (let i = 0; i < roadFeatures.length; i++) {
+                const f = roadFeatures[i];
+                if (f.type === 'speedbreaker') {
+                    const dx = worldX - f.x;
+                    if (Math.abs(dx) < f.radius) {
+                        const bump = Math.cos((dx / f.radius) * (Math.PI / 2)) * f.height;
+                        baseY -= bump;
+                    }
+                }
+            }
+            return baseY;
+        }
+
+        // ==================== PHYSICS TRUCK & CARGO INITIALIZATION ====================
+        function initTruckAndCargo() {
+            const startX = 280;
+            const startY = getRoadHeight(startX);
+
+            const engLvl = playerData.upgrades.engine;
+            const suspLvl = playerData.upgrades.suspension;
+            const tireLvl = playerData.upgrades.tires;
+            const fuelLvl = playerData.upgrades.fuel;
+
+            truck = {
+                x: startX,
+                y: startY - 68,
+                vx: 0,
+                vy: 0,
+                angle: 0,
+                vAngle: 0,
+                wheelBase: 136,
+                rearWheel: { x: startX - 68, y: startY - 26, vy: 0, radius: 27, rot: 0, onGround: false },
+                frontWheel: { x: startX + 68, y: startY - 26, vy: 0, radius: 27, rot: 0, onGround: false },
+                fuel: 100,
+                maxFuel: 100 + (fuelLvl - 1) * 25,
+                health: 100,
+                // Upgraded physical parameters
+                enginePower: 0.42 + (engLvl - 1) * 0.065,
+                maxSpeed: 15.5 + (engLvl - 1) * 1.6,
+                springK: 0.24 + (suspLvl - 1) * 0.03,
+                damping: 0.78 + (suspLvl - 1) * 0.025,
+                grip: 0.92 + (tireLvl - 1) * 0.04,
+                smokeTimer: 0
+            };
+
+            // Load Cargo Items into the Truck Bed
+            cargoItems = [];
+            const count = parseInt(playerData.cargoCount) || 8;
+            const cargoTypes = [
+                { type: 'mango', label: 'রাজশাহীর আম', w: 34, h: 24, color: '#f59e0b', border: '#78350f' },
+                { type: 'sack', label: 'চালের বস্তা', w: 38, h: 22, color: '#d6d3d1', border: '#57534e' },
+                { type: 'tv', label: 'ইলেকট্রনিক্স', w: 34, h: 28, color: '#38bdf8', border: '#0369a1' },
+                { type: 'crate', label: 'সবজি ক্যারেট', w: 35, h: 24, color: '#22c55e', border: '#14532d' }
+            ];
+
+            for (let i = 0; i < count; i++) {
+                const col = i % 3;
+                const row = Math.floor(i / 3);
+                const template = cargoTypes[i % cargoTypes.length];
+                // Local coordinates inside truck bed (bed is from localX -108 to +18, localY -18 upward)
+                cargoItems.push({
+                    ...template,
+                    localX: -82 + col * 37 + (Math.random() - 0.5) * 3,
+                    localY: -32 - row * 25,
+                    vx: 0,
+                    vy: 0,
+                    angle: (Math.random() - 0.5) * 0.06,
+                    vAngle: 0,
+                    inBed: true,
+                    worldX: 0,
+                    worldY: 0
+                });
+            }
+        }
+
+        // ==================== PHYSICS STEP (60 FPS) ====================
+        function updatePhysics() {
+            if (gameState !== 'PLAYING') return;
+
+            const gravity = 0.42;
+
+            // Check Toll Plaza Barrier Blocking
+            for (let f of roadFeatures) {
+                if (f.type === 'toll' && !f.gateOpen) {
+                    const distToToll = f.x - truck.x;
+                    if (distToToll > -20 && distToToll < 170) {
+                        activeToll = f;
+                        document.getElementById('checkpointModal').classList.remove('hidden');
+                        // Physical barrier stops the truck if gate is closed
+                        if (distToToll < 95 && truck.vx > 0.5) {
+                            truck.vx *= 0.3;
+                            truck.x = f.x - 95;
+                        }
+                    } else if (activeToll === f && (distToToll < -50 || distToToll > 240)) {
+                        activeToll = null;
+                        document.getElementById('checkpointModal').classList.add('hidden');
+                    }
+                }
+            }
+
+            // Target Wheel Positions relative to Truck Chassis
+            const cosA = Math.cos(truck.angle);
+            const sinA = Math.sin(truck.angle);
+            const halfWB = truck.wheelBase * 0.5;
+            const suspRestLength = 42;
+
+            const rearTargetX = truck.x - cosA * halfWB - sinA * suspRestLength;
+            const rearTargetY = truck.y - sinA * halfWB + cosA * suspRestLength;
+
+            const frontTargetX = truck.x + cosA * halfWB - sinA * suspRestLength;
+            const frontTargetY = truck.y + sinA * halfWB + cosA * suspRestLength;
+
+            // Update Rear & Front Wheels against Road Terrain
+            const wheels = [
+                { w: truck.rearWheel, tx: rearTargetX, ty: rearTargetY, side: -1 },
+                { w: truck.frontWheel, tx: frontTargetX, ty: frontTargetY, side: 1 }
+            ];
+
+            let totalLiftForceY = 0;
+            let totalTorque = 0;
+
+            wheels.forEach(({ w, tx, ty, side }) => {
+                w.x = tx;
+                w.vy += gravity;
+                w.y += w.vy;
+
+                const groundY = getRoadHeight(w.x);
+                if (w.y + w.radius >= groundY) {
+                    const penetration = (w.y + w.radius) - groundY;
+                    w.y = groundY - w.radius;
+
+                    // Impact detection for sound, sparks & truck damage
+                    if (w.vy > 7.5) {
+                        sound.playThud(w.vy / 8);
+                        const dmg = (w.vy - 7.0) * 1.4;
+                        truck.health = Math.max(0, truck.health - dmg);
+                        spawnDust(w.x, groundY, 7, '#f59e0b');
+                    }
+                    w.vy = 0;
+                    w.onGround = true;
+
+                    // Spawn road dust or rain splashes when moving
+                    if (Math.abs(truck.vx) > 2.5 && Math.random() < 0.35) {
+                        const pColor = weatherMode === 'rain' ? '#bae6fd' : '#a8a29e';
+                        spawnDust(w.x, groundY, 1, pColor);
+                    }
+                } else {
+                    w.onGround = false;
+                }
+
+                // Suspension Spring Force between Wheel and Chassis Target
+                const dispY = ty - w.y;
+                const springForce = dispY * truck.springK;
+                totalLiftForceY -= springForce;
+                totalTorque += side * springForce * 0.0017;
+
+                // Rotate wheel visually
+                w.rot += (truck.vx / w.radius);
+            });
+
+            // Driving Controls (Gas, Brake, Tilt)
+            const groundedCount = (truck.rearWheel.onGround ? 1 : 0) + (truck.frontWheel.onGround ? 1 : 0);
+            const wetMultiplier = weatherMode === 'rain' ? 0.84 : 1.0;
+
+            if (keys.right && truck.fuel > 0) {
+                if (groundedCount > 0) {
+                    const slopeFactor = Math.cos(truck.angle);
+                    truck.vx += truck.enginePower * truck.grip * wetMultiplier * slopeFactor;
+                    // Slight front-end lift torque on hard acceleration
+                    totalTorque -= 0.0022;
+                }
+                truck.fuel = Math.max(0, truck.fuel - (0.022 / (1 + (playerData.upgrades.fuel - 1) * 0.2)));
+            }
+
+            if (keys.left) {
+                if (truck.vx > 0.2 && groundedCount > 0) {
+                    // Braking
+                    truck.vx *= 0.91;
+                    totalTorque += 0.0025; // Nose dive when braking
+                } else if (groundedCount > 0 && truck.fuel > 0) {
+                    // Reverse
+                    truck.vx -= truck.enginePower * 0.6;
+                }
+            }
+
+            // Manual Chassis Tilt / Balance Controls
+            if (keys.up) totalTorque -= 0.0038;
+            if (keys.down) totalTorque += 0.0038;
+
+            // Natural slope gravity pull & air drag
+            const roadSlope = (getRoadHeight(truck.x + 35) - getRoadHeight(truck.x - 35)) / 70;
+            if (groundedCount > 0) {
+                truck.vx -= Math.sin(Math.atan(roadSlope)) * 0.25;
+                truck.vx *= 0.985; // Rolling friction
+            } else {
+                truck.vx *= 0.995; // Air resistance
+            }
+
+            // Clamp speed
+            truck.vx = Math.max(-6, Math.min(truck.maxSpeed, truck.vx));
+
+            // Apply Chassis Vertical & Angular Velocities
+            truck.vy += gravity + totalLiftForceY;
+            truck.vy *= truck.damping;
+            truck.x += truck.vx;
+            truck.y += truck.vy;
+
+            // Prevent moving behind start wall
+            if (truck.x < 180) {
+                truck.x = 180;
+                truck.vx = 0;
+            }
+
+            // Keep chassis aligned toward wheel line angle
+            const wheelAngle = Math.atan2(truck.frontWheel.y - truck.rearWheel.y, truck.frontWheel.x - truck.rearWheel.x);
+            const angleDiff = wheelAngle - truck.angle;
+            truck.vAngle += angleDiff * 0.14 + totalTorque;
+            truck.vAngle *= 0.82;
+            truck.angle += truck.vAngle;
+
+            // Check Extreme Rollover / Flip
+            if (Math.abs(truck.angle) > Math.PI * 0.58) {
+                truck.health = Math.max(0, truck.health - 0.8);
+            }
+
+            // Exhaust Smoke Particles
+            truck.smokeTimer++;
+            if (truck.smokeTimer % (keys.right ? 4 : 11) === 0) {
+                const exX = truck.x - cosA * 18 + sinA * 52;
+                const exY = truck.y - sinA * 18 - cosA * 52;
+                particles.push({
+                    x: exX,
+                    y: exY,
+                    vx: -truck.vx * 0.2 + (Math.random() - 0.5) * 0.8,
+                    vy: -1.2 - Math.random() * 1.2,
+                    size: keys.right ? 9 : 5,
+                    alpha: 0.55,
+                    color: keys.right ? '#334155' : '#94a3b8',
+                    type: 'smoke'
+                });
+            }
+
+            // ==================== CARGO BOXES PHYSICS IN TRUCK BED ====================
+            // Bed Boundaries in truck-local space:
+            // Back Tailgate: x = -114, Front Cabin Wall: x = +16, Bed Floor: y = -16
+            const tailgateHeight = -72; // Boxes stacked higher than this can spill over the tailgate!
+
+            cargoItems.forEach((box, i) => {
+                if (box.inBed) {
+                    // Inertia from truck acceleration, bumps, and tilt
+                    box.vy += 0.35 + truck.vy * 0.16;
+                    box.vx += Math.sin(truck.angle) * 0.38 - (keys.right ? 0.05 : 0);
+
+                    // Vertical bounce when truck hits speedbreaker or pothole
+                    if (Math.abs(truck.vAngle) > 0.028 || truck.vy < -2.6) {
+                        box.vy -= Math.abs(truck.vAngle) * 14 + Math.max(0, -truck.vy * 0.28);
+                        box.vx -= Math.abs(truck.vAngle) * 7;
+                    }
+
+                    box.localX += box.vx;
+                    box.localY += box.vy;
+                    box.vx *= 0.84;
+                    box.vy *= 0.86;
+                    box.angle = truck.angle + (box.vx * 0.05);
+
+                    // Floor collision
+                    if (box.localY > -18) {
+                        box.localY = -18;
+                        box.vy = 0;
+                    }
+
+                    // Cabin front wall collision
+                    if (box.localX > 10) {
+                        box.localX = 10;
+                        box.vx *= -0.3;
+                    }
+
+                    // Tailgate collision (if below tailgate height, keep in bed; if airborne above tailgate, spill out!)
+                    if (box.localX < -106) {
+                        if (box.localY > tailgateHeight && Math.abs(truck.angle) < 0.48) {
+                            box.localX = -106;
+                            box.vx *= -0.3;
+                        } else {
+                            // Cargo spills off the back of the truck!
+                            box.inBed = false;
+                            box.worldX = truck.x + box.localX * cosA - box.localY * sinA;
+                            box.worldY = truck.y + box.localX * sinA + box.localY * cosA;
+                            box.vx = truck.vx * 0.4 - 2.5;
+                            box.vy = -3.5;
+                            showBanner(`😱 হায় হায়! ১টি ${box.label} রাস্তা পড়ে গেছে!`);
+                            sound.playThud(1.3);
+                            addFloatingText(box.worldX, box.worldY - 20, `-${box.label}!`, '#ef4444');
+                        }
+                    }
+
+                    // Simple box-on-box stacking support
+                    for (let j = 0; j < i; j++) {
+                        const other = cargoItems[j];
+                        if (!other.inBed) continue;
+                        const dx = box.localX - other.localX;
+                        const dy = box.localY - other.localY;
+                        if (Math.abs(dx) < 31 && Math.abs(dy) < 23) {
+                            if (box.localY < other.localY) {
+                                box.localY = other.localY - 23;
+                                box.vy = Math.min(0, box.vy);
+                            } else {
+                                box.localX += dx > 0 ? 1.5 : -1.5;
+                            }
+                        }
+                    }
+                } else {
+                    // Fallen Cargo Physics in World Space
+                    box.vy += gravity;
+                    box.worldX += box.vx;
+                    box.worldY += box.vy;
+                    box.angle += box.vx * 0.04;
+                    const gY = getRoadHeight(box.worldX);
+                    if (box.worldY + 12 >= gY) {
+                        box.worldY = gY - 12;
+                        box.vy *= -0.3;
+                        box.vx *= 0.85;
+                    }
+                }
+            });
+
+            // Smooth Camera Follow
+            const targetCamX = truck.x - W * 0.28 + truck.vx * 14;
+            const targetCamY = truck.y - H * 0.62;
+            camX += (targetCamX - camX) * 0.12;
+            camY += (targetCamY - camY) * 0.1;
+
+            // Update Audio Engine Pitch
+            sound.updateEngine(truck.vx / truck.maxSpeed, keys.right, true);
+
+            // Check Upcoming Obstacle Warning Banner
+            checkUpcomingHazards();
+
+            // Update Particles & Floating Texts
+            updateParticles();
+
+            // Check Win / Lose Conditions
+            const currentDistM = Math.max(0, Math.floor((truck.x - 280) / PIXELS_PER_METER));
+            const savedCargo = cargoItems.filter(c => c.inBed).length;
+
+            if (currentDistM >= currentLevel.distance) {
+                finishLevel(true, 'ডেলিভারি সফলভাবে গন্তব্যে পৌঁছেছে!');
+            } else if (truck.health <= 0) {
+                finishLevel(false, 'ট্রাকের ইঞ্জিন ও সাসপেনশন ভেঙে গেছে!');
+            } else if (truck.fuel <= 0 && Math.abs(truck.vx) < 0.2) {
+                finishLevel(false, 'রাস্তার মাঝখানে ডিজেল শেষ হয়ে গেছে!');
+            } else if (savedCargo === 0) {
+                finishLevel(false, 'সবগুলো ডেলিভারি মালপত্র রাস্তায় পড়ে নষ্ট হয়ে গেছে!');
+            }
+
+            // Update HUD UI
+            updateHUD(currentDistM, savedCargo);
+        }
+
+        function spawnDust(x, y, count, color) {
+            for (let i = 0; i < count; i++) {
+                particles.push({
+                    x: x + (Math.random() - 0.5) * 14,
+                    y: y - 3,
+                    vx: -truck.vx * 0.3 + (Math.random() - 0.5) * 2.5,
+                    vy: -Math.random() * 2.8 - 0.5,
+                    size: 4 + Math.random() * 5,
+                    alpha: 0.75,
+                    color,
+                    type: 'dust'
+                });
+            }
+        }
+
+        function addFloatingText(x, y, text, color = '#facc15') {
+            floatingTexts.push({ x, y, text, color, alpha: 1.0, vy: -1.4 });
+        }
+
+        function updateParticles() {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.x += p.vx;
+                p.y += p.vy;
+                if (p.type === 'smoke') p.size += 0.18;
+                p.alpha -= 0.022;
+                if (p.alpha <= 0) particles.splice(i, 1);
+            }
+
+            for (let i = floatingTexts.length - 1; i >= 0; i--) {
+                const ft = floatingTexts[i];
+                ft.y += ft.vy;
+                ft.alpha -= 0.018;
+                if (ft.alpha <= 0) floatingTexts.splice(i, 1);
+            }
+
+            // Raindrops update
+            if (weatherMode === 'rain') {
+                while (raindrops.length < 95) {
+                    raindrops.push({
+                        x: Math.random() * W,
+                        y: Math.random() * H,
+                        len: 14 + Math.random() * 12,
+                        speed: 14 + Math.random() * 6
+                    });
+                }
+                raindrops.forEach(r => {
+                    r.x -= 3.5;
+                    r.y += r.speed;
+                    if (r.y > H) {
+                        r.y = -20;
+                        r.x = Math.random() * (W + 200);
+                    }
+                });
+            }
+        }
+
+        let bannerTimeout = null;
+        function showBanner(msg) {
+            const banner = document.getElementById('eventBanner');
+            banner.textContent = msg;
+            banner.classList.remove('hidden');
+            clearTimeout(bannerTimeout);
+            bannerTimeout = setTimeout(() => banner.classList.add('hidden'), 2600);
+        }
+
+        let lastWarnX = -9999;
+        function checkUpcomingHazards() {
+            // Check proximity to Mega Billboards to show interactive WhatsApp toast banner
+            let nearMegaBillboard = null;
+            for (let d of bgDecors) {
+                if (d.type === 'mega_billboard' && Math.abs(d.x - truck.x) < 270) {
+                    nearMegaBillboard = d;
+                    break;
+                }
+            }
+            const bbToast = document.getElementById('billboardToast');
+            if (nearMegaBillboard) {
+                const titleEl = document.getElementById('bbToastTitle');
+                if (nearMegaBillboard.adType === 'website') {
+                    titleEl.textContent = '🌐 আপনার ব্যবসার ওয়েবসাইট দরকার? আজই যোগাযোগ করুন!';
+                } else if (nearMegaBillboard.adType === 'marketing') {
+                    titleEl.textContent = '📈 ডিজিটাল মার্কেটিং সার্ভিস? ব্যবসার সেল বাড়ান বহুগুণ!';
+                } else if (nearMegaBillboard.adType === 'onlineshop') {
+                    titleEl.textContent = '🛍️ অনলাইন শপ খুলুন! ঘরে বসেই সারাদেশে পণ্য বিক্রি করুন!';
+                } else if (nearMegaBillboard.adType === 'ecommerce') {
+                    titleEl.textContent = '🛒 ই-কমার্স ওয়েবসাইট তৈরি করে ব্যবসাকে করুন অটোমেটেড!';
+                } else {
+                    titleEl.textContent = '💰 ভেরিফায়েড গুগল এডসেন্স একাউন্ট (Google AdSense) কিনুন!';
+                }
+                bbToast.classList.remove('hidden');
+            } else {
+                bbToast.classList.add('hidden');
+            }
+
+            for (let f of roadFeatures) {
+                const dist = f.x - truck.x;
+                if (dist > 250 && dist < 480 && Math.abs(f.x - lastWarnX) > 380) {
+                    lastWarnX = f.x;
+                    if (f.type === 'speedbreaker') {
+                        showBanner('⚠️ সামনে গতিরোধক (Speedbreaker)! গতি কমান!');
+                    } else if (f.type === 'pothole') {
+                        showBanner('🕳️ সামনে ভাঙা রাস্তা ও গর্ত! সাবধানে ব্যালেন্স করুন!');
+                    } else if (f.type === 'bridge') {
+                        showBanner(`🌉 সামনে ${f.name}! পিকআপ ধরে রাখুন!`);
+                    }
+                    break;
+                }
+            }
+        }
+
+        // ==================== RENDERING ENGINE ====================
+        function renderWorld() {
+            // 1. Sky Gradient based on Weather/Time
+            const grad = ctx.createLinearGradient(0, 0, 0, H);
+            if (weatherMode === 'night') {
+                grad.addColorStop(0, '#020617');
+                grad.addColorStop(1, '#1e1b4b');
+            } else if (weatherMode === 'sunset') {
+                grad.addColorStop(0, '#311042');
+                grad.addColorStop(0.6, '#c2410c');
+                grad.addColorStop(1, '#fde047');
+            } else if (weatherMode === 'rain') {
+                grad.addColorStop(0, '#0f172a');
+                grad.addColorStop(1, '#475569');
+            } else {
+                grad.addColorStop(0, '#0284c7');
+                grad.addColorStop(1, '#e0f2fe');
+            }
+            ctx.fillStyle = grad;
+            ctx.fillRect(0, 0, W, H);
+
+            // Sun or Moon & Stars
+            if (weatherMode === 'night') {
+                ctx.fillStyle = '#fef08a';
+                ctx.beginPath();
+                ctx.arc(W * 0.82, H * 0.18, 34, 0, Math.PI * 2);
+                ctx.fill();
+            } else if (weatherMode !== 'rain') {
+                ctx.fillStyle = weatherMode === 'sunset' ? '#fb923c' : '#fde047';
+                ctx.beginPath();
+                ctx.arc(W * 0.78, H * 0.22, 42, 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            // 2. Parallax Layer 1: Distant Dhaka Skyline & Flyover Silhouettes
+            ctx.fillStyle = weatherMode === 'night' ? '#0f172a' : 'rgba(30, 41, 59, 0.35)';
+            const parallax1 = -(camX * 0.15) % 900;
+            for (let x = parallax1 - 900; x < W + 900; x += 900) {
+                // Distant buildings & mosque domes
+                ctx.fillRect(x + 60, H * 0.42, 95, H * 0.4);
+                ctx.fillRect(x + 170, H * 0.35, 110, H * 0.45);
+                ctx.fillRect(x + 310, H * 0.46, 85, H * 0.4);
+                // Padma/Flyover truss silhouette in background
+                ctx.beginPath();
+                ctx.arc(x + 560, H * 0.56, 130, Math.PI, 0);
+                ctx.lineWidth = 6;
+                ctx.strokeStyle = ctx.fillStyle;
+                ctx.stroke();
+                ctx.fillRect(x + 710, H * 0.38, 120, H * 0.42);
+            }
+
+            // 3. Parallax Layer 2: Lush Green Bangladeshi Rural Horizon
+            ctx.fillStyle = weatherMode === 'night' ? '#064e3b' : '#15803d';
+            ctx.beginPath();
+            ctx.moveTo(0, H);
+            for (let sx = 0; sx <= W + 60; sx += 60) {
+                const wx = sx + camX * 0.35;
+                const hy = H * 0.65 + Math.sin(wx * 0.003) * 35 + Math.cos(wx * 0.008) * 18;
+                ctx.lineTo(sx, hy);
+            }
+            ctx.lineTo(W, H);
+            ctx.closePath();
+            ctx.fill();
+
+            // Enter World Camera Transform
+            ctx.save();
+            ctx.translate(-camX, -camY);
+
+            // 4. Roadside Scenery (Tong Stalls, Banyan Trees, Buildings, Billboards)
+            drawRoadsideScenery();
+
+            // 5. Draw Main Highway Terrain & Bridges
+            drawRoadAndTerrain();
+
+            // 6. Start Warehouse & Finish Goal Arch
+            drawStartAndFinish();
+
+            // 7. Draw Toll Plaza Barriers
+            drawTollPlazas();
+
+            // 8. Draw Fallen Cargo on Road
+            cargoItems.forEach(box => {
+                if (!box.inBed) drawSingleCargoBox(box.worldX, box.worldY, box.angle, box);
+            });
+
+            // 9. Draw The Bangladeshi Decorated Truck ("Maayer Doa")
+            if (truck) drawBangladeshiTruck();
+
+            // 10. Draw Particles & Floating Texts
+            particles.forEach(p => {
+                ctx.globalAlpha = Math.max(0, p.alpha);
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            ctx.globalAlpha = 1;
+
+            floatingTexts.forEach(ft => {
+                ctx.globalAlpha = Math.max(0, ft.alpha);
+                ctx.font = 'bold 18px "Hind Siliguri", sans-serif';
+                ctx.fillStyle = ft.color;
+                ctx.strokeStyle = '#000';
+                ctx.lineWidth = 3;
+                ctx.strokeText(ft.text, ft.x - 30, ft.y);
+                ctx.fillText(ft.text, ft.x - 30, ft.y);
+            });
+            ctx.globalAlpha = 1;
+
+            ctx.restore();
+
+            // 11. Screen-Space Rain Overlay
+            if (weatherMode === 'rain') {
+                ctx.strokeStyle = 'rgba(186, 230, 253, 0.55)';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                raindrops.forEach(r => {
+                    ctx.moveTo(r.x, r.y);
+                    ctx.lineTo(r.x - 4, r.y + r.len);
+                });
+                ctx.stroke();
+            }
+        }
+
+        function drawRoadsideScenery() {
+            clickableBillboardBounds = [];
+
+            bgDecors.forEach(d => {
+                if (d.x < camX - 550 || d.x > camX + W + 550) return;
+
+                if (d.type === 'mega_billboard') {
+                    drawMegaHighwayBillboard(d);
+                } else if (d.type === 'tea_stall') {
+                    // Bangladeshi Tong Tea Stall (টং দোকান)
+                    const x = d.x, y = d.y;
+                    ctx.fillStyle = '#78350f';
+                    ctx.fillRect(x - 45, y - 68, 90, 68);
+                    // Corrugated Tin Roof
+                    ctx.fillStyle = '#dc2626';
+                    ctx.beginPath();
+                    ctx.moveTo(x - 55, y - 68);
+                    ctx.lineTo(x + 55, y - 68);
+                    ctx.lineTo(x + 42, y - 92);
+                    ctx.lineTo(x - 42, y - 92);
+                    ctx.closePath();
+                    ctx.fill();
+                    // Hanging Banana Bunch & Kettle
+                    ctx.fillStyle = '#facc15';
+                    ctx.fillRect(x - 30, y - 62, 12, 18);
+                    ctx.fillStyle = '#cbd5e1';
+                    ctx.beginPath();
+                    ctx.arc(x + 18, y - 32, 9, 0, Math.PI * 2);
+                    ctx.fill();
+                    // Signboard
+                    ctx.fillStyle = '#16a34a';
+                    ctx.fillRect(x - 38, y - 88, 76, 16);
+                    ctx.fillStyle = '#ffffff';
+                    ctx.font = 'bold 10px "Hind Siliguri", sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('মামা চা স্টল', x, y - 76);
+                    ctx.textAlign = 'left';
+                } else if (d.type === 'banyan_tree') {
+                    // Bangladeshi Banyan Tree (বটগাছ)
+                    const x = d.x, y = d.y, s = d.scale || 1;
+                    ctx.save();
+                    ctx.translate(x, y);
+                    ctx.scale(s, s);
+                    ctx.fillStyle = '#5c4033';
+                    ctx.fillRect(-12, -85, 24, 85);
+                    // Hanging aerial roots
+                    ctx.strokeStyle = '#78350f';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(-28, -65); ctx.lineTo(-28, -15);
+                    ctx.moveTo(26, -60); ctx.lineTo(26, -12);
+                    ctx.stroke();
+                    // Lush Green Canopy
+                    ctx.fillStyle = '#15803d';
+                    ctx.beginPath();
+                    ctx.arc(0, -105, 48, 0, Math.PI * 2);
+                    ctx.arc(-36, -85, 34, 0, Math.PI * 2);
+                    ctx.arc(36, -85, 34, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                } else if (d.type === 'building') {
+                    // Roadside Building
+                    const x = d.x, y = d.y;
+                    const h = d.floors * 42;
+                    ctx.fillStyle = d.color;
+                    ctx.fillRect(x - 42, y - h, 84, h);
+                    ctx.strokeStyle = '#334155';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(x - 42, y - h, 84, h);
+                    // Windows
+                    ctx.fillStyle = weatherMode === 'night' ? '#fef08a' : '#38bdf8';
+                    for (let f = 0; f < d.floors; f++) {
+                        ctx.fillRect(x - 28, y - h + 12 + f * 42, 18, 18);
+                        ctx.fillRect(x + 10, y - h + 12 + f * 42, 18, 18);
+                    }
+                }
+            });
+        }
+
+        // Draw Realistic Overhead Steel-Truss Gantry & Roadside Unipole Billboards
+        function drawMegaHighwayBillboard(d) {
+            const x = d.x;
+            const y = d.y;
+            const boardW = 450;
+            const boardH = 165;
+            const extraH = d.heightOffset || 0;
+            const boardLeft = x - boardW / 2;
+            const boardTop = y - 345 - extraH;
+            const boardBottom = boardTop + boardH;
+            const mountStyle = d.mountStyle || 'gantry';
+
+            // Record screen-space coordinates so the player can click directly on the billboard
+            clickableBillboardBounds.push({
+                screenX: boardLeft - camX,
+                screenY: boardTop - camY,
+                w: boardW,
+                h: boardH,
+                adType: d.adType
+            });
+
+            ctx.save();
+
+            // 1. Support Pillars Based on Randomized Mounting Style (Unipole vs. Gantry vs. Double-Pillar)
+            if (mountStyle === 'unipole') {
+                // Heavy Roadside Monopole / Unipole Steel Column in Center
+                ctx.fillStyle = '#64748b';
+                ctx.fillRect(x - 32, y - 18, 64, 24);
+                ctx.strokeStyle = '#1e293b';
+                ctx.lineWidth = 2;
+                ctx.strokeRect(x - 32, y - 18, 64, 24);
+
+                // Cylindrical Steel Pillar with Shading
+                const poleGrad = ctx.createLinearGradient(x - 18, 0, x + 18, 0);
+                poleGrad.addColorStop(0, '#334155');
+                poleGrad.addColorStop(0.45, '#94a3b8');
+                poleGrad.addColorStop(1, '#1e293b');
+                ctx.fillStyle = poleGrad;
+                ctx.fillRect(x - 16, boardBottom + 18, 32, y - (boardBottom + 18) - 14);
+
+                // V-Shaped Steel Support Arms Holding the Billboard
+                ctx.strokeStyle = '#475569';
+                ctx.lineWidth = 7;
+                ctx.beginPath();
+                ctx.moveTo(x, boardBottom + 48);
+                ctx.lineTo(x - 125, boardBottom + 4);
+                ctx.moveTo(x, boardBottom + 48);
+                ctx.lineTo(x + 125, boardBottom + 4);
+                ctx.stroke();
+            } else {
+                // Heavy Steel Lattice Support Columns (Wide Gantry or Double Pillar)
+                const spread = mountStyle === 'gantry' ? 145 : 95;
+                const pillarOffsets = [-spread, spread];
+                pillarOffsets.forEach(offset => {
+                    const px = x + offset;
+                    // Concrete foundation base
+                    ctx.fillStyle = '#94a3b8';
+                    ctx.fillRect(px - 18, y - 16, 36, 22);
+                    ctx.strokeStyle = '#334155';
+                    ctx.lineWidth = 2;
+                    ctx.strokeRect(px - 18, y - 16, 36, 22);
+
+                    // Vertical steel column posts
+                    ctx.fillStyle = '#475569';
+                    ctx.fillRect(px - 13, boardBottom, 6, y - boardBottom - 14);
+                    ctx.fillRect(px + 7, boardBottom, 6, y - boardBottom - 14);
+
+                    // Cross-bracing steel diagonals
+                    ctx.strokeStyle = '#64748b';
+                    ctx.lineWidth = 2.5;
+                    ctx.beginPath();
+                    for (let py = boardBottom + 14; py < y - 24; py += 26) {
+                        ctx.moveTo(px - 10, py);
+                        ctx.lineTo(px + 10, py + 24);
+                        ctx.moveTo(px + 10, py);
+                        ctx.lineTo(px - 10, py + 24);
+                    }
+                    ctx.stroke();
+                });
+            }
+
+            // 2. Horizontal Steel Gantry Truss Under the Billboard
+            const trussH = 24;
+            ctx.fillStyle = '#334155';
+            ctx.fillRect(boardLeft + 8, boardBottom, boardW - 16, 5);
+            ctx.fillRect(boardLeft + 8, boardBottom + trussH, boardW - 16, 5);
+            ctx.strokeStyle = '#64748b';
+            ctx.lineWidth = 2.5;
+            ctx.beginPath();
+            for (let tx = boardLeft + 12; tx < boardLeft + boardW - 24; tx += 24) {
+                ctx.moveTo(tx, boardBottom + 3);
+                ctx.lineTo(tx + 12, boardBottom + trussH);
+                ctx.lineTo(tx + 24, boardBottom + 3);
+            }
+            ctx.stroke();
+
+            // 3. Top Floodlights / Spotlights Row (8 lamps along top edge)
+            const isDark = (weatherMode === 'night' || weatherMode === 'sunset' || weatherMode === 'rain');
+            for (let i = 0; i < 8; i++) {
+                const lx = boardLeft + 32 + i * ((boardW - 64) / 7);
+                // Curved lamp arm
+                ctx.strokeStyle = '#475569';
+                ctx.lineWidth = 2.5;
+                ctx.beginPath();
+                ctx.moveTo(lx, boardTop);
+                ctx.lineTo(lx + 7, boardTop - 16);
+                ctx.stroke();
+                // Lamp head
+                ctx.fillStyle = isDark ? '#fef08a' : '#334155';
+                ctx.fillRect(lx + 1, boardTop - 19, 12, 5);
+            }
+
+            // 4. Outer Metallic Frame & Drop Shadow
+            ctx.fillStyle = 'rgba(0,0,0,0.45)';
+            ctx.fillRect(boardLeft + 6, boardTop + 6, boardW, boardH);
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(boardLeft - 4, boardTop - 4, boardW + 8, boardH + 8);
+
+            // Clip inner billboard canvas
+            ctx.save();
+            ctx.beginPath();
+            ctx.rect(boardLeft, boardTop, boardW, boardH);
+            ctx.clip();
+
+            // Helper function to draw the shared Center WhatsApp Contact Block
+            const drawCenterWhatsAppContact = (ctaLine1, ctaLine2, badgeColor = '#16a34a') => {
+                const waX = boardLeft + 186;
+                const waY = boardTop + 66;
+                ctx.fillStyle = '#22c55e';
+                ctx.beginPath();
+                ctx.arc(waX, waY, 22, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.lineWidth = 3.5;
+                ctx.strokeStyle = '#ffffff';
+                ctx.stroke();
+
+                // WhatsApp Speech Bubble Tail
+                ctx.fillStyle = '#22c55e';
+                ctx.beginPath();
+                ctx.moveTo(waX - 16, waY + 12);
+                ctx.lineTo(waX - 24, waY + 23);
+                ctx.lineTo(waX - 7, waY + 19);
+                ctx.closePath();
+                ctx.fill();
+
+                // Phone Handset Icon inside WhatsApp Circle
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 20px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('✆', waX, waY + 7);
+
+                // Center Section Texts & Pill Badge
+                ctx.textAlign = 'left';
+                ctx.fillStyle = '#0f172a';
+                ctx.font = 'bold 14.5px "Hind Siliguri", sans-serif';
+                ctx.fillText('সরাসরি যোগাযোগ করুন:', boardLeft + 214, boardTop + 40);
+
+                // Green Pill Badge: wa.me/+8801516514216
+                ctx.fillStyle = badgeColor;
+                ctx.beginPath();
+                ctx.roundRect(boardLeft + 212, boardTop + 48, 144, 24, 12);
+                ctx.fill();
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 12px sans-serif';
+                ctx.fillText('wa.me/+8801516514216', boardLeft + 218, boardTop + 64);
+
+                // Bold Bengali Phone Number
+                ctx.fillStyle = '#0f172a';
+                ctx.font = 'bold 16px "Hind Siliguri", sans-serif';
+                ctx.fillText('+৮৮০ ১৫১৬-৫১৪২১৬', boardLeft + 214, boardTop + 93);
+
+                // Bottom Call-to-Action Text
+                ctx.fillStyle = '#0f172a';
+                ctx.font = 'bold 12px "Hind Siliguri", sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(ctaLine1, boardLeft + 262, boardTop + 122);
+                ctx.fillText(ctaLine2, boardLeft + 262, boardTop + 141);
+            };
+
+            // Helper function for Left & Right Curved Split Banner Layout
+            const drawSplitBannerBase = (leftBg, ribbonColor, rightBg1, rightBg2) => {
+                ctx.fillStyle = '#f8fafc';
+                ctx.fillRect(boardLeft, boardTop, boardW, boardH);
+
+                // Left Curved Section
+                ctx.fillStyle = leftBg;
+                ctx.beginPath();
+                ctx.moveTo(boardLeft, boardTop);
+                ctx.lineTo(boardLeft + 158, boardTop);
+                ctx.quadraticCurveTo(boardLeft + 188, boardTop + boardH * 0.5, boardLeft + 150, boardBottom);
+                ctx.lineTo(boardLeft, boardBottom);
+                ctx.closePath();
+                ctx.fill();
+
+                // Accent Swoosh Ribbon on Left Curve
+                ctx.fillStyle = ribbonColor;
+                ctx.beginPath();
+                ctx.moveTo(boardLeft + 154, boardTop);
+                ctx.lineTo(boardLeft + 170, boardTop);
+                ctx.quadraticCurveTo(boardLeft + 200, boardTop + boardH * 0.5, boardLeft + 162, boardBottom);
+                ctx.lineTo(boardLeft + 148, boardBottom);
+                ctx.quadraticCurveTo(boardLeft + 184, boardTop + boardH * 0.5, boardLeft + 154, boardTop);
+                ctx.closePath();
+                ctx.fill();
+
+                // Right Curve Background for Vector Graphics
+                ctx.fillStyle = rightBg1;
+                ctx.beginPath();
+                ctx.moveTo(boardLeft + boardW, boardTop + 12);
+                ctx.lineTo(boardLeft + boardW, boardBottom);
+                ctx.lineTo(boardLeft + 332, boardBottom);
+                ctx.quadraticCurveTo(boardLeft + 345, boardTop + boardH * 0.55, boardLeft + boardW, boardTop + 12);
+                ctx.closePath();
+                ctx.fill();
+
+                ctx.fillStyle = rightBg2;
+                ctx.beginPath();
+                ctx.moveTo(boardLeft + 392, boardTop);
+                ctx.lineTo(boardLeft + boardW, boardTop);
+                ctx.lineTo(boardLeft + boardW, boardBottom);
+                ctx.lineTo(boardLeft + 412, boardBottom);
+                ctx.closePath();
+                ctx.fill();
+            };
+
+            if (d.adType === 'website') {
+                // =========================================================================
+                // BILLBOARD 1: আপনার ব্যবসার ওয়েবসাইট দরকার? (Royal Blue & Green Split)
+                // =========================================================================
+                drawSplitBannerBase('#0d3b8c', '#22c55e', '#0d3b8c', '#16a34a');
+
+                // Left Panel Bengali Headline Text
+                ctx.textAlign = 'left';
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 20px "Hind Siliguri", sans-serif';
+                ctx.fillText('আপনার ব্যবসার', boardLeft + 14, boardTop + 34);
+
+                ctx.fillStyle = '#4ade80';
+                ctx.fillText('ওয়েবসাইট', boardLeft + 14, boardTop + 62);
+
+                ctx.fillStyle = '#ffffff';
+                ctx.fillText('দরকার?', boardLeft + 14, boardTop + 90);
+
+                ctx.font = 'bold 13px "Hind Siliguri", sans-serif';
+                ctx.fillStyle = '#f1f5f9';
+                ctx.fillText('পেশাদার ওয়েবসাইট', boardLeft + 14, boardTop + 122);
+                ctx.fillText('তৈরি ও ডিজাইন সেবা', boardLeft + 14, boardTop + 142);
+
+                drawCenterWhatsAppContact('আজই আপনার স্বপ্নের ওয়েবসাইট', 'বানিয়ে ব্যবসা বাড়ান!', '#16a34a');
+
+                // Right Section: Isometric Laptop, Web Analytics & Smartphone Mockups
+                ctx.save();
+                ctx.translate(boardLeft + 392, boardTop + 88);
+                ctx.rotate(-0.12);
+                ctx.fillStyle = '#1e293b';
+                ctx.fillRect(-26, -34, 52, 34);
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(-23, -31, 46, 28);
+                ctx.fillStyle = '#2563eb';
+                ctx.fillRect(-23, -31, 46, 7);
+                ctx.fillStyle = '#22c55e';
+                ctx.fillRect(-19, -20, 18, 12);
+                ctx.fillStyle = '#cbd5e1';
+                ctx.fillRect(3, -20, 16, 5);
+                ctx.fillRect(3, -12, 14, 5);
+                ctx.fillStyle = '#94a3b8';
+                ctx.beginPath();
+                ctx.moveTo(-32, 0);
+                ctx.lineTo(32, 0);
+                ctx.lineTo(26, 9);
+                ctx.lineTo(-26, 9);
+                ctx.closePath();
+                ctx.fill();
+                ctx.restore();
+
+                // Floating Web UI Card (Top Right)
+                ctx.fillStyle = '#ffffff';
+                ctx.strokeStyle = '#38bdf8';
+                ctx.lineWidth = 1.5;
+                ctx.fillRect(boardLeft + 398, boardTop + 16, 42, 28);
+                ctx.strokeRect(boardLeft + 398, boardTop + 16, 42, 28);
+                ctx.fillStyle = '#22c55e';
+                ctx.fillRect(boardLeft + 403, boardTop + 22, 14, 6);
+                ctx.fillStyle = '#f59e0b';
+                ctx.fillRect(boardLeft + 420, boardTop + 22, 14, 16);
+
+                // Smartphone (Bottom Right)
+                ctx.fillStyle = '#0f172a';
+                ctx.beginPath();
+                ctx.roundRect(boardLeft + 418, boardTop + 98, 22, 42, 4);
+                ctx.fill();
+                ctx.fillStyle = '#38bdf8';
+                ctx.fillRect(boardLeft + 420, boardTop + 103, 18, 31);
+                ctx.fillStyle = '#22c55e';
+                ctx.fillRect(boardLeft + 422, boardTop + 108, 14, 10);
+
+            } else if (d.adType === 'marketing') {
+                // =========================================================================
+                // BILLBOARD 2: ডিজিটাল মার্কেটিং সার্ভিস? (Deep Purple/Indigo & Vibrant Orange)
+                // =========================================================================
+                drawSplitBannerBase('#4c1d95', '#f97316', '#311042', '#ea580c');
+
+                // Left Panel Bengali Headline Text
+                ctx.textAlign = 'left';
+                ctx.fillStyle = '#fde047';
+                ctx.font = 'bold 20px "Hind Siliguri", sans-serif';
+                ctx.fillText('ডিজিটাল', boardLeft + 14, boardTop + 34);
+
+                ctx.fillStyle = '#ffffff';
+                ctx.fillText('মার্কেটিং', boardLeft + 14, boardTop + 62);
+
+                ctx.fillStyle = '#fb923c';
+                ctx.fillText('সার্ভিস?', boardLeft + 14, boardTop + 90);
+
+                ctx.font = 'bold 12.5px "Hind Siliguri", sans-serif';
+                ctx.fillStyle = '#f1f5f9';
+                ctx.fillText('ফেসবুক বুস্টিং, এসইও (SEO)', boardLeft + 14, boardTop + 122);
+                ctx.fillText('ও ব্র্যান্ড প্রমোশন সেবা', boardLeft + 14, boardTop + 142);
+
+                drawCenterWhatsAppContact('সঠিক মার্কেটিংয়ের মাধ্যমে আপনার', 'ব্যবসার সেল বাড়ান বহুগুণ!', '#ea580c');
+
+                // Right Section: Rising Growth Bar Chart & Megaphone Vector Graphics
+                // Growth Chart Card
+                ctx.fillStyle = '#ffffff';
+                ctx.strokeStyle = '#f97316';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.roundRect(boardLeft + 362, boardTop + 82, 78, 62, 6);
+                ctx.fill();
+                ctx.stroke();
+
+                // Rising Bars
+                ctx.fillStyle = '#38bdf8';
+                ctx.fillRect(boardLeft + 372, boardTop + 118, 11, 18);
+                ctx.fillStyle = '#f59e0b';
+                ctx.fillRect(boardLeft + 389, boardTop + 106, 11, 30);
+                ctx.fillStyle = '#22c55e';
+                ctx.fillRect(boardLeft + 406, boardTop + 92, 11, 44);
+                ctx.fillStyle = '#ec4899';
+                ctx.fillRect(boardLeft + 423, boardTop + 88, 11, 48);
+
+                // Megaphone Icon (Top Right)
+                ctx.save();
+                ctx.translate(boardLeft + 398, boardTop + 46);
+                ctx.rotate(-0.25);
+                // Cone
+                ctx.fillStyle = '#facc15';
+                ctx.beginPath();
+                ctx.moveTo(-18, -6);
+                ctx.lineTo(16, -18);
+                ctx.lineTo(16, 18);
+                ctx.lineTo(-18, 6);
+                ctx.closePath();
+                ctx.fill();
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                // Mouthpiece & Handle
+                ctx.fillStyle = '#ef4444';
+                ctx.fillRect(-24, -6, 7, 12);
+                ctx.fillRect(-14, 6, 6, 12);
+                // Sound waves
+                ctx.strokeStyle = '#fef08a';
+                ctx.lineWidth = 2.5;
+                ctx.beginPath();
+                ctx.arc(20, 0, 8, -0.6, 0.6);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.arc(20, 0, 15, -0.6, 0.6);
+                ctx.stroke();
+                ctx.restore();
+
+            } else if (d.adType === 'onlineshop') {
+                // =========================================================================
+                // BILLBOARD 3: অনলাইন শপ খুলুন (Emerald/Teal & Gold/Orange Split)
+                // =========================================================================
+                drawSplitBannerBase('#065f46', '#facc15', '#0f766e', '#d97706');
+
+                // Left Panel Bengali Headline Text
+                ctx.textAlign = 'left';
+                ctx.fillStyle = '#fde047';
+                ctx.font = 'bold 21px "Hind Siliguri", sans-serif';
+                ctx.fillText('অনলাইন শপ', boardLeft + 14, boardTop + 42);
+
+                ctx.fillStyle = '#ffffff';
+                ctx.fillText('খুলুন আজই!', boardLeft + 14, boardTop + 74);
+
+                ctx.font = 'bold 12.5px "Hind Siliguri", sans-serif';
+                ctx.fillStyle = '#ecfdf5';
+                ctx.fillText('খুব সহজেই নিজের অনলাইন', boardLeft + 14, boardTop + 114);
+                ctx.fillText('শপ শুরু করুন আজই', boardLeft + 14, boardTop + 136);
+
+                drawCenterWhatsAppContact('ঘরে বসেই সারাদেশে পণ্য বিক্রি', 'ও ডেলিভারি সিস্টেম চালু করুন!', '#059669');
+
+                // Right Section: Digital Storefront Awning & Shopping Bags
+                const sx = boardLeft + 362;
+                const sy = boardTop + 34;
+                // Store Body
+                ctx.fillStyle = '#ffffff';
+                ctx.strokeStyle = '#fde047';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.roundRect(sx, sy + 18, 76, 64, 6);
+                ctx.fill();
+                ctx.stroke();
+
+                // Striped Store Awning Canopy
+                const stripeColors = ['#ef4444', '#ffffff', '#ef4444', '#ffffff', '#ef4444'];
+                for (let s = 0; s < 5; s++) {
+                    ctx.fillStyle = stripeColors[s];
+                    ctx.fillRect(sx - 4 + s * 16.8, sy + 6, 16.8, 16);
+                }
+                // Store Window & Door
+                ctx.fillStyle = '#38bdf8';
+                ctx.fillRect(sx + 8, sy + 32, 34, 28);
+                ctx.fillStyle = '#f59e0b';
+                ctx.fillRect(sx + 48, sy + 32, 20, 48);
+
+                // Colorful Shopping Bag Icon (Bottom Right Foreground)
+                ctx.fillStyle = '#ec4899';
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.roundRect(boardLeft + 398, boardTop + 102, 38, 44, 5);
+                ctx.fill();
+                ctx.stroke();
+                // Bag Handle Arch
+                ctx.beginPath();
+                ctx.arc(boardLeft + 417, boardTop + 102, 9, Math.PI, 0);
+                ctx.stroke();
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 10px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('SHOP', boardLeft + 417, boardTop + 128);
+
+            } else if (d.adType === 'ecommerce') {
+                // =========================================================================
+                // BILLBOARD 4: ই-কমার্স ওয়েবসাইট (Crimson/Dark Red & Clean Green Split)
+                // =========================================================================
+                drawSplitBannerBase('#991b1b', '#facc15', '#7f1d1d', '#16a34a');
+
+                // Left Panel Bengali Headline Text
+                ctx.textAlign = 'left';
+                ctx.fillStyle = '#fde047';
+                ctx.font = 'bold 21px "Hind Siliguri", sans-serif';
+                ctx.fillText('ই-কমার্স', boardLeft + 14, boardTop + 42);
+
+                ctx.fillStyle = '#ffffff';
+                ctx.fillText('ওয়েবসাইট', boardLeft + 14, boardTop + 74);
+
+                ctx.font = 'bold 12px "Hind Siliguri", sans-serif';
+                ctx.fillStyle = '#fef2f2';
+                ctx.fillText('পেমেন্ট গেটওয়ে ও অর্ডার', boardLeft + 14, boardTop + 114);
+                ctx.fillText('ট্র্যাকিংসহ পূর্ণাঙ্গ ই-কমার্স', boardLeft + 14, boardTop + 136);
+
+                drawCenterWhatsAppContact('আধুনিক ই-কমার্স ওয়েবসাইট তৈরি', 'করে ব্যবসাকে করুন অটোমেটেড!', '#b91c1c');
+
+                // Right Section: Shopping Cart, Credit Card & Product Catalog UI
+                // Credit / Payment Card (Top Right)
+                ctx.save();
+                ctx.translate(boardLeft + 402, boardTop + 42);
+                ctx.rotate(0.14);
+                ctx.fillStyle = '#fbbf24';
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.roundRect(-32, -18, 64, 38, 6);
+                ctx.fill();
+                ctx.stroke();
+                ctx.fillStyle = '#0f172a';
+                ctx.fillRect(-32, -10, 64, 8);
+                ctx.fillStyle = '#dc2626';
+                ctx.beginPath();
+                ctx.arc(16, 8, 6, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+
+                // Shopping Cart Card (Bottom Right)
+                ctx.fillStyle = '#ffffff';
+                ctx.strokeStyle = '#22c55e';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.roundRect(boardLeft + 362, boardTop + 82, 78, 64, 8);
+                ctx.fill();
+                ctx.stroke();
+
+                // Cart Basket Lines
+                const cx = boardLeft + 382;
+                const cy = boardTop + 104;
+                ctx.strokeStyle = '#dc2626';
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.moveTo(cx - 12, cy - 10);
+                ctx.lineTo(cx - 4, cy - 10);
+                ctx.lineTo(cx + 4, cy + 14);
+                ctx.lineTo(cx + 32, cy + 14);
+                ctx.lineTo(cx + 38, cy - 4);
+                ctx.lineTo(cx - 1, cy - 4);
+                ctx.stroke();
+                // Cart Wheels
+                ctx.fillStyle = '#0f172a';
+                ctx.beginPath();
+                ctx.arc(cx + 7, cy + 22, 4.5, 0, Math.PI * 2);
+                ctx.arc(cx + 28, cy + 22, 4.5, 0, Math.PI * 2);
+                ctx.fill();
+                // "BUY" Green Tag
+                ctx.fillStyle = '#16a34a';
+                ctx.fillRect(cx + 4, cy - 16, 30, 12);
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 8px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText('ORDER', cx + 19, cy - 7);
+
+            } else {
+                // =========================================================================
+                // BILLBOARD 5: GOOGLE ADSENSE ACCOUNT SELLING AD (Google AdSense Brand Colors)
+                // =========================================================================
+                ctx.fillStyle = '#0f172a';
+                ctx.fillRect(boardLeft, boardTop, boardW, boardH);
+
+                // Top 4-Color Google Brand Bar
+                const barW = boardW / 4;
+                const gColors = ['#4285F4', '#EA4335', '#FBBC05', '#34A853'];
+                for (let c = 0; c < 4; c++) {
+                    ctx.fillStyle = gColors[c];
+                    ctx.fillRect(boardLeft + c * barW, boardTop, barW, 8);
+                }
+
+                // Left Glow & Google AdSense Emblem Card
+                ctx.fillStyle = '#1e293b';
+                ctx.strokeStyle = '#facc15';
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.roundRect(boardLeft + 14, boardTop + 20, 118, 130, 14);
+                ctx.fill();
+                ctx.stroke();
+
+                // Big Google AdSense "$" & "G" Monetization Coin Icon
+                const gx = boardLeft + 73;
+                const gy = boardTop + 60;
+                ctx.fillStyle = '#FBBC05';
+                ctx.beginPath();
+                ctx.arc(gx, gy, 26, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = '#ffffff';
+                ctx.stroke();
+
+                ctx.font = 'bold 28px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillStyle = '#0f172a';
+                ctx.fillText('$', gx, gy + 10);
+
+                // Google AdSense Badge
+                ctx.fillStyle = '#4285F4';
+                ctx.beginPath();
+                ctx.roundRect(boardLeft + 22, boardTop + 96, 102, 22, 6);
+                ctx.fill();
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 10.5px sans-serif';
+                ctx.fillText('GOOGLE ADSENSE', gx, boardTop + 111);
+
+                ctx.fillStyle = '#4ade80';
+                ctx.font = 'bold 10px "Hind Siliguri", sans-serif';
+                ctx.fillText('১০০% নিরাপদ ও গ্যারান্টি', gx, boardTop + 138);
+
+                // Center/Right Headline & Bullet Features
+                ctx.textAlign = 'left';
+                ctx.fillStyle = '#facc15';
+                ctx.font = 'bold 19px "Hind Siliguri", sans-serif';
+                ctx.fillText('গুগল এডসেন্স একাউন্ট কিনুন!', boardLeft + 146, boardTop + 36);
+
+                ctx.fillStyle = '#e2e8f0';
+                ctx.font = 'bold 12.5px "Hind Siliguri", sans-serif';
+                ctx.fillText('✅ পিন ভেরিফায়েড ও ফ্রেশ Google AdSense Account', boardLeft + 146, boardTop + 60);
+                ctx.fillText('✅ ওয়েবসাইট ও ইউটিউব মনিটাইজেশনের জন্য ১০০% প্রস্তুত', boardLeft + 146, boardTop + 80);
+                ctx.fillText('✅ সুলভ মূল্যে বিশ্বস্ততার সাথে তাৎক্ষণিক ডেলিভারি', boardLeft + 146, boardTop + 100);
+
+                // Bottom WhatsApp Call-to-Action Bar
+                ctx.fillStyle = '#16a34a';
+                ctx.beginPath();
+                ctx.roundRect(boardLeft + 146, boardTop + 112, 290, 40, 10);
+                ctx.fill();
+                ctx.strokeStyle = '#fde047';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                ctx.fillStyle = '#ffffff';
+                ctx.font = 'bold 13.5px "Hind Siliguri", sans-serif';
+                ctx.fillText('✆ হোয়াটসঅ্যাপ: +৮৮০ ১৫১৬-৫১৪২১৬', boardLeft + 158, boardTop + 130);
+                ctx.fillStyle = '#fef08a';
+                ctx.font = 'bold 11.5px sans-serif';
+                ctx.fillText('👉 https://wa.me/+8801516514216', boardLeft + 158, boardTop + 146);
+            }
+
+            ctx.restore();
+
+            // 5. Spotlight Light Cones Illuminating the Billboard at Night/Rain/Sunset
+            if (isDark) {
+                for (let i = 0; i < 8; i++) {
+                    const lx = boardLeft + 32 + i * ((boardW - 64) / 7);
+                    const coneGrad = ctx.createLinearGradient(lx, boardTop - 15, lx, boardTop + 95);
+                    coneGrad.addColorStop(0, 'rgba(254, 240, 138, 0.32)');
+                    coneGrad.addColorStop(1, 'rgba(254, 240, 138, 0)');
+                    ctx.fillStyle = coneGrad;
+                    ctx.beginPath();
+                    ctx.moveTo(lx + 4, boardTop - 14);
+                    ctx.lineTo(lx - 26, boardTop + 95);
+                    ctx.lineTo(lx + 34, boardTop + 95);
+                    ctx.closePath();
+                    ctx.fill();
+                }
+            }
+
+            ctx.restore();
+        }
+
+        function drawRoadAndTerrain() {
+            const startIdx = Math.max(0, Math.floor((camX - 100) / STEP) + 30);
+            const endIdx = Math.min(terrainPts.length - 1, Math.ceil((camX + W + 150) / STEP) + 30);
+
+            // Soil / Underground Fill
+            ctx.fillStyle = '#3f2e21';
+            ctx.beginPath();
+            ctx.moveTo(terrainPts[startIdx].x, camY + H + 200);
+            for (let i = startIdx; i <= endIdx; i++) {
+                ctx.lineTo(terrainPts[i].x, terrainPts[i].y);
+            }
+            ctx.lineTo(terrainPts[endIdx].x, camY + H + 200);
+            ctx.closePath();
+            ctx.fill();
+
+            // Asphalt Highway Surface
+            ctx.beginPath();
+            for (let i = startIdx; i <= endIdx; i++) {
+                const pt = terrainPts[i];
+                if (i === startIdx) ctx.moveTo(pt.x, pt.y);
+                else ctx.lineTo(pt.x, pt.y);
+            }
+            ctx.lineWidth = 22;
+            ctx.strokeStyle = '#334155';
+            ctx.stroke();
+
+            // Dashed Highway Center Line
+            ctx.save();
+            ctx.setLineDash([24, 20]);
+            ctx.lineWidth = 4;
+            ctx.strokeStyle = '#facc15';
+            ctx.stroke();
+            ctx.restore();
+
+            // Draw Bridge Trusses & Pillars (Padma/Meghna Style)
+            roadFeatures.forEach(f => {
+                if (f.endX < camX - 200 || f.x > camX + W + 200) return;
+
+                if (f.type === 'bridge') {
+                    ctx.strokeStyle = '#94a3b8';
+                    ctx.lineWidth = 5;
+                    for (let bx = f.x; bx <= f.endX; bx += 90) {
+                        const ry = getRoadHeight(bx);
+                        // Concrete Pillar below bridge
+                        ctx.fillStyle = '#64748b';
+                        ctx.fillRect(bx - 14, ry + 10, 28, 320);
+                        // Overhead Steel Truss Arch
+                        ctx.beginPath();
+                        ctx.moveTo(bx, ry);
+                        ctx.lineTo(bx + 45, ry - 95);
+                        ctx.lineTo(bx + 90, ry);
+                        ctx.stroke();
+                    }
+                } else if (f.type === 'speedbreaker') {
+                    if (f.x < camX - 100 || f.x > camX + W + 100) return;
+                    const sy = getRoadHeight(f.x - f.radius);
+                    // Yellow & Black Zebra Speedbreaker
+                    ctx.fillStyle = '#facc15';
+                    ctx.beginPath();
+                    ctx.arc(f.x, sy + 2, f.radius, Math.PI, 0);
+                    ctx.fill();
+                    ctx.strokeStyle = '#dc2626';
+                    ctx.lineWidth = 3;
+                    ctx.stroke();
+                } else if (f.type === 'pothole') {
+                    if (f.x < camX - 100 || f.x > camX + W + 100) return;
+                    const py = getRoadHeight(f.x);
+                    ctx.fillStyle = '#1c1917';
+                    ctx.beginPath();
+                    ctx.ellipse(f.x, py - 4, 26, 9, 0, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+            });
+        }
+
+        function drawStartAndFinish() {
+            // Start Point: Dhaka Cargo Depot
+            const startY = getRoadHeight(180);
+            ctx.fillStyle = '#1e3a8a';
+            ctx.fillRect(60, startY - 160, 140, 160);
+            ctx.fillStyle = '#facc15';
+            ctx.fillRect(50, startY - 175, 160, 26);
+            ctx.fillStyle = '#000';
+            ctx.font = 'bold 14px "Hind Siliguri"';
+            ctx.fillText('ঢাকা কার্গো ডিপো', 78, startY - 157);
+
+            // Finish Point: Destination Gate
+            const finishX = currentLevel.distance * PIXELS_PER_METER + 280;
+            const finishY = getRoadHeight(finishX);
+            ctx.fillStyle = '#15803d';
+            ctx.fillRect(finishX - 12, finishY - 190, 16, 190);
+            ctx.fillRect(finishX + 90, finishY - 190, 16, 190);
+            ctx.fillStyle = '#dc2626';
+            ctx.strokeStyle = '#facc15';
+            ctx.lineWidth = 4;
+            ctx.fillRect(finishX - 25, finishY - 210, 145, 45);
+            ctx.strokeRect(finishX - 25, finishY - 210, 145, 45);
+            ctx.fillStyle = '#fff';
+            ctx.font = 'bold 16px "Hind Siliguri"';
+            ctx.fillText('🏁 গন্তব্য আড়ত 🏁', finishX - 10, finishY - 182);
+        }
+
+        function drawTollPlazas() {
+            roadFeatures.forEach(f => {
+                if (f.type !== 'toll') return;
+                const ty = f.y;
+                // Toll Booth Canopy
+                ctx.fillStyle = '#0f172a';
+                ctx.fillRect(f.x - 25, ty - 165, 50, 165);
+                ctx.fillStyle = '#16a34a';
+                ctx.strokeStyle = '#facc15';
+                ctx.lineWidth = 3;
+                ctx.fillRect(f.x - 75, ty - 195, 150, 36);
+                ctx.strokeRect(f.x - 75, ty - 195, 150, 36);
+
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 13px "Hind Siliguri"';
+                ctx.textAlign = 'center';
+                ctx.fillText('পদ্মা সেতু টোল প্লাজা - ৳১০০', f.x, ty - 172);
+                ctx.textAlign = 'left';
+
+                // Red & White Barrier Arm
+                ctx.save();
+                ctx.translate(f.x, ty - 52);
+                ctx.rotate(f.gateOpen ? -Math.PI * 0.45 : 0);
+                ctx.fillStyle = '#ef4444';
+                ctx.fillRect(-85, -6, 90, 12);
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(-65, -6, 20, 12);
+                ctx.fillRect(-25, -6, 20, 12);
+                ctx.restore();
+            });
+        }
+
+        // ==================== BANGLADESHI TRUCK ART RENDERER ====================
+        function drawBangladeshiTruck() {
+            const pal = TRUCK_PALETTES[playerData.paletteIdx % TRUCK_PALETTES.length];
+
+            ctx.save();
+            ctx.translate(truck.x, truck.y);
+            ctx.rotate(truck.angle);
+
+            // Headlight Beam at Night / Rain
+            if (headlightsOn || weatherMode === 'night' || weatherMode === 'rain') {
+                const beamGrad = ctx.createLinearGradient(95, -5, 440, 40);
+                beamGrad.addColorStop(0, 'rgba(254, 240, 138, 0.55)');
+                beamGrad.addColorStop(1, 'rgba(254, 240, 138, 0)');
+                ctx.fillStyle = beamGrad;
+                ctx.beginPath();
+                ctx.moveTo(95, -8);
+                ctx.lineTo(450, -65);
+                ctx.lineTo(450, 95);
+                ctx.closePath();
+                ctx.fill();
+            }
+
+            // 1. Draw Cargo Boxes Currently Inside the Bed
+            cargoItems.forEach(box => {
+                if (box.inBed) {
+                    drawSingleCargoBox(box.localX, box.localY, box.angle - truck.angle, box);
+                }
+            });
+
+            // 2. Chassis Steel Under-frame
+            ctx.fillStyle = '#1e293b';
+            ctx.fillRect(-115, -14, 210, 16);
+
+            // 3. Wooden & Painted Cargo Bed Side-Rails (Rickshaw Art Slats)
+            ctx.fillStyle = pal.body;
+            ctx.strokeStyle = '#fef08a';
+            ctx.lineWidth = 2.5;
+            ctx.fillRect(-114, -56, 132, 44);
+            ctx.strokeRect(-114, -56, 132, 44);
+
+            // Colorful Floral & Geometric Truck Art Panels on Cargo Bed
+            const panelColors = ['#dc2626', '#16a34a', '#2563eb', '#db2777'];
+            for (let p = 0; p < 4; p++) {
+                ctx.fillStyle = panelColors[p];
+                ctx.fillRect(-108 + p * 31, -50, 26, 32);
+                // Diamond motif inside panel
+                ctx.fillStyle = '#fef08a';
+                ctx.beginPath();
+                const cx = -95 + p * 31, cy = -34;
+                ctx.moveTo(cx, cy - 9);
+                ctx.lineTo(cx + 8, cy);
+                ctx.lineTo(cx, cy + 9);
+                ctx.lineTo(cx - 8, cy);
+                ctx.closePath();
+                ctx.fill();
+            }
+
+            // Slogan Banner on Side of Truck
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(-108, -72, 124, 16);
+            ctx.fillStyle = '#fde047';
+            ctx.font = 'bold 11px "Hind Siliguri"';
+            ctx.textAlign = 'center';
+            ctx.fillText(playerData.slogan, -46, -60);
+            ctx.textAlign = 'left';
+
+            // 4. Ornate Bangladeshi Truck Cabin (Front)
+            ctx.fillStyle = pal.cabin;
+            ctx.beginPath();
+            ctx.moveTo(18, -14);
+            ctx.lineTo(18, -82);
+            ctx.lineTo(68, -82);
+            ctx.lineTo(94, -46);
+            ctx.lineTo(96, -14);
+            ctx.closePath();
+            ctx.fill();
+            ctx.strokeStyle = '#facc15';
+            ctx.lineWidth = 3;
+            ctx.stroke();
+
+            // Iconic Crowned Prow ("Taj" above cabin roof)
+            ctx.fillStyle = pal.trim;
+            ctx.beginPath();
+            ctx.moveTo(14, -82);
+            ctx.lineTo(28, -110);
+            ctx.lineTo(76, -104);
+            ctx.lineTo(68, -82);
+            ctx.closePath();
+            ctx.fill();
+            ctx.stroke();
+
+            // Windshield & Driver Silhouette
+            ctx.fillStyle = '#bae6fd';
+            ctx.beginPath();
+            ctx.moveTo(46, -74);
+            ctx.lineTo(65, -74);
+            ctx.lineTo(86, -46);
+            ctx.lineTo(46, -46);
+            ctx.closePath();
+            ctx.fill();
+
+            // Front Bumper & Decorative Hanging Chains ("Jhumka")
+            ctx.fillStyle = '#facc15';
+            ctx.fillRect(88, -20, 14, 12);
+            ctx.strokeStyle = '#ef4444';
+            ctx.lineWidth = 2;
+            for (let c = -105; c <= 85; c += 24) {
+                ctx.beginPath();
+                ctx.moveTo(c, 2);
+                ctx.lineTo(c - 3, 10);
+                ctx.stroke();
+            }
+
+            ctx.restore();
+
+            // 5. Draw Bouncy Rear & Front Wheels in World Space
+            drawTruckWheel(truck.rearWheel, pal.rim);
+            drawTruckWheel(truck.frontWheel, pal.rim);
+        }
+
+        function drawTruckWheel(w, rimColor) {
+            ctx.save();
+            ctx.translate(w.x, w.y);
+            ctx.rotate(w.rot);
+
+            // Rubber Tire
+            ctx.fillStyle = '#171717';
+            ctx.beginPath();
+            ctx.arc(0, 0, w.radius, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.lineWidth = 3;
+            ctx.strokeStyle = '#404040';
+            ctx.stroke();
+
+            // Tire Treads
+            ctx.strokeStyle = '#525252';
+            ctx.lineWidth = 2;
+            for (let i = 0; i < 8; i++) {
+                const a = (i / 8) * Math.PI * 2;
+                ctx.beginPath();
+                ctx.moveTo(Math.cos(a) * (w.radius - 5), Math.sin(a) * (w.radius - 5));
+                ctx.lineTo(Math.cos(a) * w.radius, Math.sin(a) * w.radius);
+                ctx.stroke();
+            }
+
+            // Colorful Bangladeshi Painted Wheel Rim
+            ctx.fillStyle = rimColor;
+            ctx.beginPath();
+            ctx.arc(0, 0, w.radius * 0.55, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.fillStyle = '#dc2626';
+            ctx.beginPath();
+            ctx.arc(0, 0, w.radius * 0.25, 0, Math.PI * 2);
+            ctx.fill();
+
+            ctx.restore();
+        }
+
+        function drawSingleCargoBox(x, y, angle, box) {
+            ctx.save();
+            ctx.translate(x, y);
+            ctx.rotate(angle);
+
+            ctx.fillStyle = box.color;
+            ctx.strokeStyle = box.border;
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.roundRect(-box.w / 2, -box.h / 2, box.w, box.h, 4);
+            ctx.fill();
+            ctx.stroke();
+
+            // Detail stripe on crate/sack
+            ctx.fillStyle = 'rgba(255,255,255,0.75)';
+            ctx.font = 'bold 8px "Hind Siliguri"';
+            ctx.textAlign = 'center';
+            ctx.fillText(box.type === 'mango' ? 'আম' : box.type === 'sack' ? 'চাল' : box.type === 'tv' ? 'TV' : 'মাল', 0, 3);
+
+            ctx.restore();
+        }
+
+        // ==================== UI, HUD & MENU LOGIC ====================
+        function updateHUD(distM, savedCargo) {
+            const pctFuel = Math.round((truck.fuel / truck.maxFuel) * 100);
+            const pctHealth = Math.round(truck.health);
+            const pctDist = Math.min(100, (distM / currentLevel.distance) * 100);
+
+            document.getElementById('fuelBar').style.width = `${pctFuel}%`;
+            document.getElementById('fuelText').textContent = `${pctFuel}%`;
+            document.getElementById('healthBar').style.width = `${pctHealth}%`;
+            document.getElementById('healthText').textContent = `${pctHealth}%`;
+
+            document.getElementById('cargoCountText').textContent = `${savedCargo} / ${cargoItems.length}`;
+            document.getElementById('distanceText').textContent = `${distM}m / ${currentLevel.distance}m`;
+            document.getElementById('progressBar').style.width = `${pctDist}%`;
+
+            const kmh = Math.round(Math.abs(truck.vx) * 5.5);
+            document.getElementById('speedText').textContent = kmh;
+
+            elapsedSeconds = Math.floor((performance.now() - startTime) / 1000);
+            const mins = String(Math.floor(elapsedSeconds / 60)).padStart(2, '0');
+            const secs = String(elapsedSeconds % 60).padStart(2, '0');
+            document.getElementById('timerText').textContent = `${mins}:${secs}`;
+        }
+
+        function populateMenuUI() {
+            document.getElementById('menuTaka').textContent = `৳ ${playerData.taka.toLocaleString('bn-BD')}`;
+            document.getElementById('hudTaka').textContent = `৳ ${playerData.taka}`;
+
+            // Render Route Cards
+            const list = document.getElementById('levelList');
+            list.innerHTML = '';
+            LEVELS.forEach((lvl, idx) => {
+                const isSelected = playerData.selectedLevel === idx;
+                const card = document.createElement('div');
+                card.className = `p-3 rounded-2xl border-2 cursor-pointer transition-all flex flex-col justify-between ${
+                    isSelected
+                        ? 'bg-gradient-to-br from-amber-500/30 to-emerald-600/30 border-yellow-300 shadow-lg scale-[1.01]'
+                        : 'bg-slate-900/75 border-slate-700 hover:border-amber-400/60'
+                }`;
+                card.innerHTML = `
+                    <div>
+                        <div class="flex justify-between items-center">
+                            <span class="text-xs font-bold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-400/40">রুট #${idx + 1}</span>
+                            <span class="text-xs font-bold text-emerald-400">৳ ${lvl.baseReward} / মাল</span>
+                        </div>
+                        <div class="font-bold text-sm sm:text-base text-white mt-1.5">${lvl.name}</div>
+                        <div class="text-[11px] text-slate-300 mt-0.5">${lvl.subtitle}</div>
+                    </div>
+                    <div class="flex justify-between items-center mt-2.5 pt-2 border-t border-slate-700/80 text-[11px] text-yellow-300 font-semibold">
+                        <span><i class="fa-solid fa-route mr-1"></i> দূরত্ব: ${lvl.distance}m</span>
+                        <span>${isSelected ? '✅ নির্বাচিত' : 'নির্বাচন করুন'}</span>
+                    </div>
+                `;
+                card.onclick = () => {
+                    playerData.selectedLevel = idx;
+                    saveProgress();
+                    populateMenuUI();
+                };
+                list.appendChild(card);
+            });
+
+            // Update Upgrade Buttons
+            const upgMap = [
+                { key: 'engine', lvlEl: 'upgEngineLvl', btnEl: 'btnUpgEngine' },
+                { key: 'suspension', lvlEl: 'upgSuspLvl', btnEl: 'btnUpgSusp' },
+                { key: 'tires', lvlEl: 'upgTireLvl', btnEl: 'btnUpgTire' },
+                { key: 'fuel', lvlEl: 'upgFuelLvl', btnEl: 'btnUpgFuel' }
+            ];
+
+            upgMap.forEach(u => {
+                const lvl = playerData.upgrades[u.key];
+                const cost = lvl * 450;
+                document.getElementById(u.lvlEl).textContent = `লেভেল ${lvl} / ৫`;
+                const btn = document.getElementById(u.btnEl);
+                if (lvl >= 5) {
+                    btn.textContent = 'সর্বোচ্চ (MAX)';
+                    btn.disabled = true;
+                    btn.classList.add('opacity-50');
+                } else {
+                    btn.textContent = `৳ ${cost}`;
+                    btn.disabled = false;
+                    btn.classList.remove('opacity-50');
+                }
+            });
+        }
+
+        window.buyUpgrade = function(type) {
+            const lvl = playerData.upgrades[type];
+            if (lvl >= 5) return;
+            const cost = lvl * 450;
+            const msgEl = document.getElementById('menuStatusMsg');
+
+            if (playerData.taka >= cost) {
+                playerData.taka -= cost;
+                playerData.upgrades[type]++;
+                sound.playCash();
+                saveProgress();
+                populateMenuUI();
+                msgEl.textContent = `✅ আলহামদুলিল্লাহ! ${type.toUpperCase()} লেভেল ${playerData.upgrades[type]}-এ আপগ্রেড হয়েছে!`;
+            } else {
+                msgEl.textContent = `❌ পর্যাপ্ত টাকা নেই! আরও ডেলিভারি ট্রিপ দিয়ে টাকা আয় করুন।`;
+            }
+        };
+
+        function startLevel() {
+            sound.init();
+            playerData.cargoCount = parseInt(document.getElementById('cargoQtySelect').value) || 8;
+            playerData.slogan = document.getElementById('sloganSelect').value;
+            saveProgress();
+
+            currentLevel = LEVELS[playerData.selectedLevel];
+            weatherMode = currentLevel.weather;
+            headlightsOn = (weatherMode === 'night' || weatherMode === 'rain');
+
+            generateWorld(currentLevel);
+            initTruckAndCargo();
+
+            document.getElementById('hudLevelName').textContent = currentLevel.name;
+            document.getElementById('hudTaka').textContent = `৳ ${playerData.taka}`;
+            document.getElementById('mainMenu').classList.add('hidden');
+            document.getElementById('resultModal').classList.add('hidden');
+            document.getElementById('checkpointModal').classList.add('hidden');
+            document.getElementById('hud').classList.remove('hidden');
+            document.getElementById('touchControls').classList.remove('hidden');
+
+            startTime = performance.now();
+            gameState = 'PLAYING';
+            sound.playMusicalHorn();
+        }
+
+        function finishLevel(isSuccess, reasonText) {
+            gameState = 'RESULT';
+            sound.updateEngine(0, false, false);
+            document.getElementById('checkpointModal').classList.add('hidden');
+
+            const distM = Math.min(currentLevel.distance, Math.max(0, Math.floor((truck.x - 280) / PIXELS_PER_METER)));
+            const savedCargo = cargoItems.filter(c => c.inBed).length;
+            const totalCargo = cargoItems.length;
+
+            const overloadMultiplier = totalCargo >= 11 ? 1.6 : totalCargo >= 8 ? 1.2 : 1.0;
+            const basePay = isSuccess
+                ? Math.round(savedCargo * currentLevel.baseReward * overloadMultiplier)
+                : Math.round((distM / currentLevel.distance) * savedCargo * 35);
+
+            const speedBonus = isSuccess ? Math.max(50, 350 - elapsedSeconds * 3) : 0;
+            const totalEarned = basePay + speedBonus;
+
+            playerData.taka += totalEarned;
+            saveProgress();
+            sound.playCash();
+
+            document.getElementById('resultTitle').textContent = isSuccess ? 'ডেলিভারি সফল হয়েছে! 🎉' : 'ট্রিপ অসম্পূর্ণ! 😢';
+            document.getElementById('resultSubtitle').textContent = reasonText;
+            document.getElementById('resDistance').textContent = `${distM}m / ${currentLevel.distance}m`;
+            document.getElementById('resCargo').textContent = `${savedCargo} / ${totalCargo} টি`;
+            document.getElementById('resBasePay').textContent = `+ ৳ ${basePay}`;
+            document.getElementById('resBonus').textContent = `+ ৳ ${speedBonus}`;
+            document.getElementById('resTotalEarned').textContent = `৳ ${totalEarned}`;
+
+            document.getElementById('resultModal').classList.remove('hidden');
+        }
+
+        // ==================== EVENT LISTENERS & CONTROLS ====================
+        window.addEventListener('keydown', e => {
+            if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = true;
+            if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A' || e.key === ' ') keys.left = true;
+            if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') keys.up = true;
+            if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') keys.down = true;
+            if (e.key === 'h' || e.key === 'H') sound.playMusicalHorn();
+            if (e.key === 'l' || e.key === 'L') headlightsOn = !headlightsOn;
+        });
+
+        window.addEventListener('keyup', e => {
+            if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = false;
+            if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A' || e.key === ' ') keys.left = false;
+            if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') keys.up = false;
+            if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') keys.down = false;
+        });
+
+        // Bind Touch & Mouse Pedals
+        function bindHoldButton(btnId, keyName) {
+            const btn = document.getElementById(btnId);
+            const start = (e) => { e.preventDefault(); keys[keyName] = true; btn.classList.add('active'); };
+            const end = (e) => { e.preventDefault(); keys[keyName] = false; btn.classList.remove('active'); };
+            btn.addEventListener('mousedown', start);
+            btn.addEventListener('mouseup', end);
+            btn.addEventListener('mouseleave', end);
+            btn.addEventListener('touchstart', start, { passive: false });
+            btn.addEventListener('touchend', end, { passive: false });
+        }
+
+        bindHoldButton('btnGas', 'right');
+        bindHoldButton('btnBrake', 'left');
+        bindHoldButton('btnTiltLeft', 'up');
+        bindHoldButton('btnTiltRight', 'down');
+
+        document.getElementById('btnHorn').addEventListener('click', () => sound.playMusicalHorn());
+        document.getElementById('startTripBtn').addEventListener('click', startLevel);
+        document.getElementById('btnRetry').addEventListener('click', startLevel);
+
+        document.getElementById('btnBackGarage').addEventListener('click', () => {
+            document.getElementById('resultModal').classList.add('hidden');
+            document.getElementById('hud').classList.add('hidden');
+            document.getElementById('touchControls').classList.add('hidden');
+            document.getElementById('mainMenu').classList.remove('hidden');
+            gameState = 'MENU';
+            populateMenuUI();
+        });
+
+        document.getElementById('pauseBtn').addEventListener('click', () => {
+            gameState = 'MENU';
+            sound.updateEngine(0, false, false);
+            document.getElementById('mainMenu').classList.remove('hidden');
+            populateMenuUI();
+        });
+
+        document.getElementById('paintColorBtn').addEventListener('click', () => {
+            playerData.paletteIdx = (playerData.paletteIdx + 1) % TRUCK_PALETTES.length;
+            saveProgress();
+            const pal = TRUCK_PALETTES[playerData.paletteIdx];
+            document.getElementById('menuStatusMsg').textContent = `🎨 ট্রাকের নতুন রঙ: ${pal.name}`;
+        });
+
+        document.getElementById('weatherBtn').addEventListener('click', () => {
+            const modes = ['day', 'sunset', 'rain', 'night'];
+            weatherMode = modes[(modes.indexOf(weatherMode) + 1) % modes.length];
+            showBanner(`🌤️ আবহাওয়া পরিবর্তন: ${weatherMode.toUpperCase()}`);
+        });
+
+        document.getElementById('headlightBtn').addEventListener('click', () => {
+            headlightsOn = !headlightsOn;
+        });
+
+        document.getElementById('soundBtn').addEventListener('click', () => {
+            sound.muted = !sound.muted;
+            document.getElementById('soundIcon').className = sound.muted ? 'fa-solid fa-volume-xmark text-lg text-red-400' : 'fa-solid fa-volume-high text-lg';
+        });
+
+        // Allow players to click directly on any Roadside Billboard on the Canvas to open WhatsApp
+        canvas.addEventListener('click', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const clickX = e.clientX - rect.left;
+            const clickY = e.clientY - rect.top;
+
+            for (let b of clickableBillboardBounds) {
+                if (clickX >= b.screenX && clickX <= b.screenX + b.w &&
+                    clickY >= b.screenY && clickY <= b.screenY + b.h) {
+                    window.open('https://wa.me/+8801516514216', '_blank', 'noopener,noreferrer');
+                    break;
+                }
+            }
+        });
+
+        // Change cursor to pointer when hovering over a highway billboard
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const mx = e.clientX - rect.left;
+            const my = e.clientY - rect.top;
+            const hovering = clickableBillboardBounds.some(b =>
+                mx >= b.screenX && mx <= b.screenX + b.w && my >= b.screenY && my <= b.screenY + b.h
+            );
+            canvas.style.cursor = hovering ? 'pointer' : 'default';
+        });
+
+        // Toll Plaza Actions
+        document.getElementById('payTollBtn').addEventListener('click', () => {
+            if (!activeToll) return;
+            if (playerData.taka >= 100) {
+                playerData.taka -= 100;
+                document.getElementById('hudTaka').textContent = `৳ ${playerData.taka}`;
+                activeToll.gateOpen = true;
+                sound.playCash();
+                addFloatingText(activeToll.x, activeToll.y - 90, 'টোল পরিশোধিত! ধন্যবাদ', '#22c55e');
+                document.getElementById('checkpointModal').classList.add('hidden');
+                activeToll = null;
+            } else {
+                showBanner('পকেটে টাকা নেই! ভিআইপি হর্ন বাজিয়ে অনুরোধ করুন!');
+            }
+        });
+
+        document.getElementById('hornPassBtn').addEventListener('click', () => {
+            if (!activeToll) return;
+            sound.playMusicalHorn();
+            activeToll.gateOpen = true;
+            addFloatingText(activeToll.x, activeToll.y - 90, 'পোঁ-পোঁ! ভিআইপি পাস!', '#facc15');
+            document.getElementById('checkpointModal').classList.add('hidden');
+            activeToll = null;
+        });
+
+        // ==================== MAIN 60FPS ANIMATION LOOP ====================
+        function gameLoop() {
+            updatePhysics();
+            renderWorld();
+            requestAnimationFrame(gameLoop);
+        }
+
+        window.onload = function () {
+            populateMenuUI();
+            generateWorld(LEVELS[0]);
+            initTruckAndCargo();
+            gameLoop();
+        };
+    </script>
+</body>
+</html>
