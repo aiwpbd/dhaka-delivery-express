@@ -1201,188 +1201,77 @@
                 return null;
             }
 
-            stopCurrentSpeech() {
-                try {
-                    this.masterAudio.pause();
-                } catch (e) {}
-                if (this.currentSource) {
-                    try { this.currentSource.stop(); } catch (e) {}
-                    this.currentSource = null;
-                }
-                if (this.synth) {
-                    try { this.synth.cancel(); } catch (e) {}
-                }
-                this.isSpeaking = false;
-            }
-
-            // Play on the single UNLOCKED Master Audio Element or WebAudio DSP Male Shifter
-            async playOnUnlockedMasterAudio(urls, textForFallback, priority = false, urlIndex = 0, isAlreadyMale = false) {
-                if (!this.enabled || sound.muted) return;
-                if (urlIndex >= urls.length) {
-                    this.speakBrowserBanglaGuaranteed(textForFallback, priority);
-                    return;
-                }
-
-                if (priority && urlIndex === 0) this.stopCurrentSpeech();
-
-                const item = urls[urlIndex];
-                const currentUrl = typeof item === 'string' ? item : item.url;
-                const streamIsMale = typeof item === 'object' && item !== null ? !!item.isMale : isAlreadyMale;
-
-                // If we have an ArrayBuffer in memory, play through WebAudio Male DSP Pitch/Speed Shifter!
-                if (item && item.buffer) {
-                    const ok = await this.playBufferWithMaleVoiceDSP(item.buffer, streamIsMale);
-                    if (ok) return;
-                }
-
-                try {
-                    this.masterAudio.pause();
-                    this.masterAudio.src = currentUrl;
-                    this.masterAudio.volume = 1.0;
-                    this.configureMasterAudioForMale(streamIsMale);
-                    this.isSpeaking = true;
-
-                    let started = false;
-                    const failTimer = setTimeout(() => {
-                        if (!started) {
-                            this.playOnUnlockedMasterAudio(urls, textForFallback, false, urlIndex + 1, isAlreadyMale);
-                        }
-                    }, 1200);
-
-                    this.masterAudio.onplaying = () => {
-                        started = true;
-                        clearTimeout(failTimer);
-                        this.configureMasterAudioForMale(streamIsMale);
-                    };
-
-                    this.masterAudio.onerror = () => {
-                        clearTimeout(failTimer);
-                        this.isSpeaking = false;
-                        this.playOnUnlockedMasterAudio(urls, textForFallback, false, urlIndex + 1, isAlreadyMale);
-                    };
-
-                    const playPromise = this.masterAudio.play();
-                    if (playPromise !== undefined) {
-                        playPromise.catch(() => {
-                            clearTimeout(failTimer);
-                            this.isSpeaking = false;
-                            this.playOnUnlockedMasterAudio(urls, textForFallback, false, urlIndex + 1, isAlreadyMale);
-                        });
-                    }
-                } catch (e) {
-                    this.isSpeaking = false;
-                }
-            }
-
             // ============================================================
-            // খাঁটি বাংলাদেশি পুরুষ কণ্ঠ — PradeepNeural Voice Engine
-            // Priority: Cache → Edge PradeepNeural relay → Google TTS
-            // ============================================================
+            // ============ সরল ও নির্ভরযোগ্য বাংলা ভয়েস ইঞ্জিন ============
             speak(text, priority = false, isStillValidCallback = null) {
                 if (!this.enabled || sound.muted) return;
-
                 const now = performance.now();
-                if (!priority && this.isSpeaking && (now - this.lastSpokenTime < 3000)) return;
-                if (!priority && text === this.lastMessage && now - this.lastSpokenTime < 5000) return;
+                if (!priority && now - this.lastSpokenTime < 2500) return;
                 if (isStillValidCallback && !isStillValidCallback()) return;
-
                 this.lastSpokenTime = now;
                 this.lastMessage = text;
-
                 if (priority) this.stopCurrentSpeech();
+                this._sayIt(text);
+            }
 
-                // STEP 1: PradeepNeural already cached? তাৎক্ষণিক বাজাও
-                if (this.audioCache.has(text)) {
-                    const cached = this.audioCache.get(text);
-                    if (cached && cached.url) { this._playUrl(cached.url); return; }
+            // মূল ভয়েস ফাংশন — SpeechSynthesis → Google TTS
+            _sayIt(text) {
+                // ১. SpeechSynthesis (সবচেয়ে নির্ভরযোগ্য — কোনো internet লাগে না)
+                if (window.speechSynthesis) {
+                    try {
+                        window.speechSynthesis.cancel();
+                        const u = new SpeechSynthesisUtterance(text);
+                        u.lang = 'bn-BD';
+                        u.volume = 1.0;
+                        u.rate = 1.0;
+                        u.pitch = 1.0;
+
+                        // Bengali voice খোঁজো (Edge-এ PradeepNeural থাকে)
+                        const vs = window.speechSynthesis.getVoices();
+                        const bn = vs.find(v => v.lang && v.lang.toLowerCase().startsWith('bn'));
+                        if (bn) u.voice = bn;
+
+                        u.onerror = () => this._googleTTS(text);
+                        window.speechSynthesis.speak(u);
+                        return;
+                    } catch(e) {}
                 }
-
-                // STEP 2: Edge PradeepNeural relay → genuine Bangladeshi male voice
-                this._fetchPradeepThenPlay(text);
+                // ২. Google TTS audio stream
+                this._googleTTS(text);
             }
 
-            // Edge TTS PradeepNeural fetch করে বাজাও, না হলে Google TTS
-            _fetchPradeepThenPlay(text) {
-                const relays = [
-                    `https://tts.travisvn.com/?text=${encodeURIComponent(text)}&voice=bn-BD-PradeepNeural&rate=+0%25`,
-                    `https://edge-tts-api.vercel.app/api/tts?text=${encodeURIComponent(text)}&voice=bn-BD-PradeepNeural&rate=+0%25`
-                ];
-                let idx = 0;
-                const tryNext = () => {
-                    if (idx >= relays.length) { this._playGoogleTTS(text); return; }
-                    const url = relays[idx++];
-                    const ctrl = new AbortController();
-                    const tid = setTimeout(() => { ctrl.abort(); tryNext(); }, 4500);
-                    fetch(url, { signal: ctrl.signal })
-                        .then(res => { clearTimeout(tid); if (!res.ok) { tryNext(); return null; } return res.arrayBuffer(); })
-                        .then(buf => {
-                            if (!buf || buf.byteLength < 500) { tryNext(); return; }
-                            const blobUrl = URL.createObjectURL(new Blob([buf], { type: "audio/mpeg" }));
-                            this.audioCache.set(text, { url: blobUrl });
-                            this._playUrl(blobUrl);
-                        })
-                        .catch(() => { clearTimeout(tid); tryNext(); });
-                };
-                tryNext();
-            }
-
-            // Audio URL বাজাও — স্বাভাবিক গতি
-            _playUrl(src) {
+            // Google TTS fallback
+            _googleTTS(text) {
+                if (!this.enabled || sound.muted) return;
+                const enc = encodeURIComponent(text);
+                const src = `https://translate.googleapis.com/translate_tts?client=gtx&ie=UTF-8&tl=bn&dt=t&q=${enc}`;
                 try {
                     this.masterAudio.pause();
                     this.masterAudio.src = src;
                     this.masterAudio.volume = 1.0;
                     this.masterAudio.playbackRate = 1.0;
-                    if ("preservesPitch" in this.masterAudio) this.masterAudio.preservesPitch = true;
-                    this.isSpeaking = true;
-                    this.masterAudio.onended = () => { this.isSpeaking = false; };
-                    this.masterAudio.onerror = () => { this.isSpeaking = false; };
+                    if ('preservesPitch' in this.masterAudio) this.masterAudio.preservesPitch = true;
                     const p = this.masterAudio.play();
-                    if (p) p.catch(() => { this.isSpeaking = false; });
-                } catch(e) { this.isSpeaking = false; }
+                    if (p) p.catch(() => {});
+                } catch(e) {}
             }
 
-            // Google TTS fallback — সবসময় কাজ করে
-            _playGoogleTTS(text) {
-                if (!this.enabled || sound.muted) return;
-                const enc = encodeURIComponent(text);
-                const urls = [
-                    `https://translate.googleapis.com/translate_tts?client=gtx&ie=UTF-8&tl=bn&dt=t&q=${enc}`,
-                    `https://translate.google.com/translate_tts?ie=UTF-8&q=${enc}&tl=bn&client=tw-ob`
-                ];
-                let i = 0;
-                const try1 = () => {
-                    if (i >= urls.length) { this.isSpeaking = false; return; }
-                    try {
-                        this.masterAudio.pause();
-                        this.masterAudio.src = urls[i++];
-                        this.masterAudio.volume = 1.0;
-                        this.masterAudio.playbackRate = 1.0;
-                        if ("preservesPitch" in this.masterAudio) this.masterAudio.preservesPitch = true;
-                        this.isSpeaking = true;
-                        let ok = false;
-                        const t = setTimeout(() => { if (!ok) { this.isSpeaking = false; try1(); } }, 3500);
-                        this.masterAudio.onplaying = () => { ok = true; clearTimeout(t); };
-                        this.masterAudio.onended = () => { clearTimeout(t); this.isSpeaking = false; };
-                        this.masterAudio.onerror = () => { clearTimeout(t); this.isSpeaking = false; try1(); };
-                        const p = this.masterAudio.play();
-                        if (p) p.catch(() => { clearTimeout(t); this.isSpeaking = false; try1(); });
-                    } catch(e) { this.isSpeaking = false; }
-                };
-                try1();
+            // Legacy compatibility — সব পুরনো call এখানে আসবে
+            playDirectBanglaAudioStream(text) { this._sayIt(text); }
+            speakBrowserBanglaGuaranteed(text) { this._sayIt(text); }
+            _fallbackSpeak(text) { this._googleTTS(text); }
+            _speakViaSynthesis(text) { this._sayIt(text); }
+            _playAudioUrl(url) {
+                try { this.masterAudio.pause(); this.masterAudio.src = url; this.masterAudio.play(); } catch(e) {}
             }
-
-            // Legacy compatibility
-            playDirectBanglaAudioStream(text) { this._playGoogleTTS(text); }
-            speakBrowserBanglaGuaranteed(text) { this._fetchPradeepThenPlay(text); }
-            _fallbackSpeak(text) { this._playGoogleTTS(text); }
-            _speakViaSynthesis(text) { this._fetchPradeepThenPlay(text); }
-            _playAudioUrl(url) { this._playUrl(url); }
+            _playUrl(url) { this._playAudioUrl(url); }
+            _playGoogleTTS(text) { this._googleTTS(text); }
+            _fetchPradeepThenPlay(text) { this._sayIt(text); }
 
             stopCurrentSpeech() {
                 try { this.masterAudio.pause(); } catch(e) {}
                 if (this.currentSource) { try { this.currentSource.stop(); } catch(e) {} this.currentSource = null; }
-                if (this.synth) { try { this.synth.cancel(); } catch(e) {} }
+                if (window.speechSynthesis) { try { window.speechSynthesis.cancel(); } catch(e) {} }
                 this.isSpeaking = false;
             }
 
