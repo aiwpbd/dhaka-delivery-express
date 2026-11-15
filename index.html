@@ -1348,8 +1348,8 @@
                         const utter = new SpeechSynthesisUtterance(text);
                         utter.voice = bnMatch.voice;
                         utter.lang = bnMatch.voice.lang || 'bn-BD';
-                        utter.rate = bnMatch.isExplicitMale ? 1.15 : 1.00;
-                        utter.pitch = bnMatch.isExplicitMale ? 0.85 : 0.1;
+                        utter.rate = bnMatch.isExplicitMale ? 1.10 : 1.05;
+                        utter.pitch = bnMatch.isExplicitMale ? 1.0 : 0.85;
                         utter.volume = 1.0;
                         utter.onstart = () => { this.isSpeaking = true; };
                         utter.onend = () => { this.isSpeaking = false; };
@@ -1382,8 +1382,8 @@
                         try {
                             const utter = new SpeechSynthesisUtterance(text);
                             utter.lang = 'bn-BD';
-                            utter.rate = 1.00;
-                            utter.pitch = 0.1;
+                            utter.rate = 1.05;
+                            utter.pitch = 0.85;
                             utter.onend = () => { this.isSpeaking = false; };
                             utter.onerror = () => { this.isSpeaking = false; };
                             this.synth.speak(utter);
@@ -1397,11 +1397,11 @@
                     this.masterAudio.src = streamUrls[streamIdx];
                     this.masterAudio.volume = 1.0;
 
-                    // Drop pitch ~5 semitones: 0.74x rate converts Google female TTS into deep Bangladeshi Male voice
+                    // Slight pitch drop for natural male tone (not robotic)
                     if ('preservesPitch' in this.masterAudio) this.masterAudio.preservesPitch = false;
                     if ('mozPreservesPitch' in this.masterAudio) this.masterAudio.mozPreservesPitch = false;
                     if ('webkitPreservesPitch' in this.masterAudio) this.masterAudio.webkitPreservesPitch = false;
-                    this.masterAudio.playbackRate = 0.74;
+                    this.masterAudio.playbackRate = 0.90;
 
                     this.isSpeaking = true;
                     let started = false;
@@ -1448,7 +1448,7 @@
                     if (bnVoice) utter.voice = bnVoice;
                     utter.lang = 'bn-BD';
                     utter.rate = 0.95;
-                    utter.pitch = 0.1; // Minimum pitch = deepest male voice possible
+                    utter.pitch = 0.85; // Natural male pitch
                     utter.volume = 1.0;
                     utter.onend = () => { this.isSpeaking = false; };
                     utter.onerror = () => { this.isSpeaking = false; };
