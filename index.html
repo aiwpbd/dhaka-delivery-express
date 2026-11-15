@@ -145,6 +145,10 @@
                     <i class="fa-brands fa-whatsapp text-lg"></i>
                     <span class="hidden md:inline">ওয়েবসাইট / মার্কেটিং সেবা</span>
                 </a>
+                <button id="voiceToggleBtn" title="বাংলা ভয়েস অন/অফ" class="bg-slate-900/90 hover:bg-slate-800 text-amber-300 border-2 border-amber-400 px-2.5 h-10 sm:h-11 rounded-xl flex items-center justify-center gap-1 shadow-lg active:scale-95 text-xs font-bold">
+                    <i id="voiceIcon" class="fa-solid fa-microphone-lines text-base text-emerald-400"></i>
+                    <span class="hidden sm:inline">বাংলা ভয়েস</span>
+                </button>
                 <button id="weatherBtn" title="আবহাওয়া পরিবর্তন (Rain/Day/Night)" class="bg-slate-900/90 hover:bg-slate-800 text-sky-300 border-2 border-sky-400 w-10 h-10 sm:w-11 sm:h-11 rounded-xl flex items-center justify-center shadow-lg active:scale-95">
                     <i class="fa-solid fa-cloud-sun-rain text-lg"></i>
                 </button>
@@ -214,6 +218,10 @@
             <button id="btnHorn" class="pedal-btn w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-b from-pink-500 to-rose-700 border-2 border-yellow-300 text-white flex flex-col items-center justify-center shadow-xl">
                 <i class="fa-solid fa-bullhorn text-xl"></i>
                 <span class="text-[10px] font-bold mt-0.5">পোঁ-পোঁ (H)</span>
+            </button>
+            <button id="btnDriverVoice" class="pedal-btn w-14 h-14 sm:w-16 sm:h-16 rounded-full bg-gradient-to-b from-indigo-500 to-purple-800 border-2 border-amber-300 text-white flex flex-col items-center justify-center shadow-xl">
+                <i class="fa-solid fa-comments text-xl text-yellow-300"></i>
+                <span class="text-[10px] font-bold mt-0.5">ডায়লগ (V)</span>
             </button>
         </div>
 
@@ -381,7 +389,7 @@
                         <div class="text-amber-300 font-bold"><i class="fa-solid fa-gamepad mr-1"></i> খেলার নিয়ম (Controls):</div>
                         <div>• <b>ডান/বাম অ্যারো বা A/D:</b> পিকআপ ও ব্রেক/রিভার্স</div>
                         <div>• <b>উপর/নিচ অ্যারো বা W/S:</b> ট্রাকের ব্যালেন্স (Tilt)</div>
-                        <div>• <b>H:</b> মিউজিক্যাল ট্রাক হর্ন | <b>L:</b> হেডলাইট অন/অফ</div>
+                        <div>• <b>H:</b> মিউজিক্যাল হর্ন | <b>V:</b> বাংলা ভয়েস ডায়লগ | <b>L:</b> লাইট</div>
                     </div>
                 </div>
             </div>
@@ -587,6 +595,319 @@
         }
 
         const sound = new SoundSystem();
+
+        // ==================== PURE BANGLA AI VOICE SYSTEM (GEMINI TTS + NATIVE BN-BD) ====================
+        class BanglaVoiceSystem {
+            constructor() {
+                this.enabled = true;
+                this.synth = window.speechSynthesis || null;
+                this.voices = [];
+                this.lastSpokenTime = 0;
+                this.lastMessage = '';
+                this.audioCache = new Map(); // Cache generated WAV URLs for instant replay
+                this.pendingTexts = new Set();
+                this.currentAudio = null;
+                this.isSpeaking = false;
+
+                if (this.synth) {
+                    const loadVoices = () => {
+                        this.voices = this.synth.getVoices();
+                    };
+                    loadVoices();
+                    if (this.synth.onvoiceschanged !== undefined) {
+                        this.synth.onvoiceschanged = loadVoices;
+                    }
+                }
+
+                // Authentic Bangladeshi Regional Truck Driver & Helper ("Ostad - Helper") Dialogues
+                this.randomDialogues = [
+                    "ওস্তাদ, ডাইনে প্লাস্টিক! বামে চাপাইয়া টান দেন, সামনে রাস্তা পুরা ফাঁকা!",
+                    "মায়ের দোয়া পরিবহন, আল্লাহ ভরসা! ওস্তাদ, পিকআপে পাড়াতা দেন!",
+                    "ওস্তাদজী, পিছে কিন্তু রাজশাহীর আম আর চালের বস্তা আছে, ঝাঁকি কইরেন না!",
+                    "সামনে মামা চা স্টল দেখা যায় ওস্তাদ, এক কাপ কড়া মালাই চা খাইলে জইমা যাইতো!",
+                    "মামা, ব্যবসার লাইগা ওয়েবসাইট বা মার্কেটিং লাগলে রাস্তার পাশের বিলবোর্ডে নাম্বার দেওয়া আছে, নক দেন!",
+                    "বিসমিল্লাহ কইয়া টান দেন ওস্তাদ, সময়ের চেয়ে জীবনের মূল্য অনেক বেশি!",
+                    "ওস্তাদ, ধোলাইখাল থেইকা নতুন পাতি স্প্রিং লাগাইছি, গাড়ি আজকা মাখনের মতো ছুটবো!",
+                    "আরে বামে চাপান ওস্তাদ! ওভারটেক কইরা সামনে আগান, আড়তে টাইমমতো মাল পৌঁছাইতে হইবো!"
+                ];
+
+                // Fixed pre-cached hazard lines for instant zero-delay playback
+                this.hazardLines = {
+                    speedbreaker: "ওস্তাদ সাবধান! সামনে উঁচা স্পিডব্রেকার, ব্রেকটা চাইপা ধরেন!",
+                    pothole: "ওস্তাদ, সামনে কিন্তু রাস্তা ভাঙা আর বড় গর্ত, চাকাটা ডাইনে-বামে দেইখা আস্তে টানেন!",
+                    bridge_padma: "ওস্তাদ সামনে পদ্মা সেতু স্প্যান, ফুল পিকআপ ধইরা টান দেন!",
+                    bridge_meghna: "ওস্তাদ সামনে মেঘনা সেতু, ফুল পিকআপ ধইরা টান দেন!",
+                    toll: "ওস্তাদ, সামনে পদ্মা সেতুর টোল প্লাজা! একশো টাকা টোল দিয়া দেন, নাইলে ভিআইপি হর্ন বাজান!",
+                    cargo_spill: "হায় হায় ওস্তাদ! পিছে থেইকা মাল রাস্তায় পইড়া গেলো তো! একটু সমঝাইয়া চালান!"
+                };
+            }
+
+            // Strictly select ONLY authentic Bengali (bn-BD / bn-IN) voices — Prefer Male voices, NEVER fallback to Hindi
+            getStrictBanglaBrowserVoice() {
+                if (!this.voices || this.voices.length === 0) {
+                    this.voices = this.synth ? this.synth.getVoices() : [];
+                }
+                const bnVoices = this.voices.filter(v =>
+                    (v.lang && (v.lang.toLowerCase().replace('_', '-').includes('bn-bd') || v.lang.toLowerCase().startsWith('bn'))) ||
+                    (v.name && (v.name.toLowerCase().includes('bangla') || v.name.toLowerCase().includes('bengali') || v.name.includes('বাংলা')))
+                );
+                // Prefer male Bengali voice if available
+                const maleBn = bnVoices.find(v => /male|pradeep|bashkar|tanishaa|ostad|man/i.test(v.name) && !/female/i.test(v.name));
+                return maleBn || bnVoices[0] || null;
+            }
+
+            // Convert base64 string to ArrayBuffer
+            base64ToArrayBuffer(base64) {
+                const binaryString = window.atob(base64);
+                const len = binaryString.length;
+                const bytes = new Uint8Array(len);
+                for (let i = 0; i < len; i++) {
+                    bytes[i] = binaryString.charCodeAt(i);
+                }
+                return bytes.buffer;
+            }
+
+            // Convert raw signed 16-bit PCM into a playable WAV Blob
+            pcmToWav(pcm16, sampleRate = 24000) {
+                const numChannels = 1;
+                const byteRate = sampleRate * numChannels * 2;
+                const blockAlign = numChannels * 2;
+                const dataSize = pcm16.length * 2;
+                const buffer = new ArrayBuffer(44 + dataSize);
+                const view = new DataView(buffer);
+
+                const writeString = (offset, str) => {
+                    for (let i = 0; i < str.length; i++) {
+                        view.setUint8(offset + i, str.charCodeAt(i));
+                    }
+                };
+
+                writeString(0, 'RIFF');
+                view.setUint32(4, 36 + dataSize, true);
+                writeString(8, 'WAVE');
+                writeString(12, 'fmt ');
+                view.setUint32(16, 16, true); // Subchunk1Size (16 for PCM)
+                view.setUint16(20, 1, true);  // AudioFormat (1 = PCM)
+                view.setUint16(22, numChannels, true);
+                view.setUint32(24, sampleRate, true);
+                view.setUint32(28, byteRate, true);
+                view.setUint16(32, blockAlign, true);
+                view.setUint16(34, 16, true); // BitsPerSample
+                writeString(36, 'data');
+                view.setUint32(40, dataSize, true);
+
+                let offset = 44;
+                for (let i = 0; i < pcm16.length; i++, offset += 2) {
+                    view.setInt16(offset, pcm16[i], true);
+                }
+
+                return new Blob([view], { type: 'audio/wav' });
+            }
+
+            // Fetch high-quality Natural Bangladeshi Regional Male voice via Gemini TTS API
+            async fetchGeminiBanglaTTS(text) {
+                if (this.audioCache.has(text)) {
+                    return this.audioCache.get(text);
+                }
+
+                const apiKey = "";
+                const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${apiKey}`;
+                const promptText = `একজন প্রাণবন্ত বাংলাদেশি ট্রাক ড্রাইভার বা হেল্পারের ভঙ্গিতে খাঁটি বাংলাদেশি আঞ্চলিক টানে ও স্পষ্ট পুরুষ কণ্ঠে বলুন: "${text}"`;
+
+                const payload = {
+                    contents: [{
+                        parts: [{ text: promptText }]
+                    }],
+                    generationConfig: {
+                        responseModalities: ["AUDIO"],
+                        speechConfig: {
+                            voiceConfig: {
+                                prebuiltVoiceConfig: { voiceName: "Charon" }
+                            }
+                        }
+                    },
+                    model: "gemini-2.5-flash-preview-tts"
+                };
+
+                const delays = [1000, 2000, 4000];
+                for (let attempt = 0; attempt <= delays.length; attempt++) {
+                    try {
+                        const response = await fetch(apiUrl, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+
+                        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+                        const result = await response.json();
+                        const part = result?.candidates?.[0]?.content?.parts?.[0];
+                        const audioData = part?.inlineData?.data;
+                        const mimeType = part?.inlineData?.mimeType || "audio/L16;rate=24000";
+
+                        if (audioData) {
+                            const rateMatch = mimeType.match(/rate=(\d+)/);
+                            const sampleRate = rateMatch ? parseInt(rateMatch[1], 10) : 24000;
+                            const pcmBuffer = this.base64ToArrayBuffer(audioData);
+                            const pcm16 = new Int16Array(pcmBuffer);
+                            const wavBlob = this.pcmToWav(pcm16, sampleRate);
+                            const audioUrl = URL.createObjectURL(wavBlob);
+                            this.audioCache.set(text, audioUrl);
+                            return audioUrl;
+                        }
+                        break;
+                    } catch (err) {
+                        if (attempt < delays.length) {
+                            await new Promise(r => setTimeout(r, delays[attempt]));
+                        }
+                    }
+                }
+                return null;
+            }
+
+            stopCurrentSpeech() {
+                if (this.currentAudio) {
+                    this.currentAudio.pause();
+                    this.currentAudio.currentTime = 0;
+                    this.currentAudio = null;
+                }
+                if (this.synth) {
+                    this.synth.cancel();
+                }
+                this.isSpeaking = false;
+            }
+
+            playWavUrl(url, priority) {
+                if (!this.enabled || sound.muted) return;
+                if (priority) this.stopCurrentSpeech();
+
+                const audio = new Audio(url);
+                audio.volume = 1.0;
+                this.currentAudio = audio;
+                this.isSpeaking = true;
+
+                audio.onended = () => {
+                    if (this.currentAudio === audio) {
+                        this.isSpeaking = false;
+                        this.currentAudio = null;
+                    }
+                };
+                audio.onerror = () => {
+                    if (this.currentAudio === audio) {
+                        this.isSpeaking = false;
+                        this.currentAudio = null;
+                    }
+                };
+
+                audio.play().catch(() => {
+                    this.isSpeaking = false;
+                });
+            }
+
+            // Speak using Browser's Native Bengali Voice immediately with zero network delay
+            speakImmediateBrowserBangla(text, priority = false) {
+                const strictBnVoice = this.getStrictBanglaBrowserVoice();
+                if (this.synth && strictBnVoice) {
+                    try {
+                        if (priority) this.stopCurrentSpeech();
+                        const utter = new SpeechSynthesisUtterance(text);
+                        utter.voice = strictBnVoice;
+                        utter.lang = 'bn-BD';
+                        utter.rate = 1.04;
+                        utter.pitch = 0.82; // Deeper male voice pitch
+                        utter.volume = 1.0;
+
+                        utter.onstart = () => { this.isSpeaking = true; };
+                        utter.onend = () => { this.isSpeaking = false; };
+                        utter.onerror = () => { this.isSpeaking = false; };
+
+                        this.synth.speak(utter);
+                        return true;
+                    } catch (e) {
+                        this.isSpeaking = false;
+                    }
+                }
+                return false;
+            }
+
+            // Core speak method with optional validator callback so late network responses never play after passing an obstacle
+            async speak(text, priority = false, isStillValidCallback = null) {
+                if (!this.enabled || sound.muted) return;
+
+                const now = performance.now();
+                if (!priority && (now - this.lastSpokenTime < 2200 || this.isSpeaking)) return;
+                if (!priority && text === this.lastMessage && now - this.lastSpokenTime < 5500) return;
+
+                this.lastSpokenTime = now;
+                this.lastMessage = text;
+
+                // 1. If already cached in Gemini Natural Bangla Audio, play immediately (0ms latency)!
+                if (this.audioCache.has(text)) {
+                    if (isStillValidCallback && !isStillValidCallback()) return;
+                    this.playWavUrl(this.audioCache.get(text), priority);
+                    return;
+                }
+
+                // 2. If native Bangla voice exists on device AND this is a time-critical road warning, play immediately while caching AI voice in background
+                if (isStillValidCallback && this.speakImmediateBrowserBangla(text, priority)) {
+                    if (!this.pendingTexts.has(text)) {
+                        this.pendingTexts.add(text);
+                        this.fetchGeminiBanglaTTS(text).finally(() => this.pendingTexts.delete(text));
+                    }
+                    return;
+                }
+
+                // 3. Request Natural Bangladeshi Bangla TTS from Gemini API
+                if (!this.pendingTexts.has(text)) {
+                    this.pendingTexts.add(text);
+                    const wavUrl = await this.fetchGeminiBanglaTTS(text);
+                    this.pendingTexts.delete(text);
+
+                    if (wavUrl) {
+                        // Crucial check: If the truck already passed the speedbreaker/hazard while fetching, discard playback!
+                        if (isStillValidCallback && !isStillValidCallback()) return;
+                        this.playWavUrl(wavUrl, priority);
+                        return;
+                    }
+                }
+
+                // 4. Fallback ONLY if a genuine Bengali (bn-BD / bn) voice exists on device
+                if (!isStillValidCallback || isStillValidCallback()) {
+                    this.speakImmediateBrowserBangla(text, priority);
+                }
+            }
+
+            // Pre-warm all hazard & billboard Bangla voice lines sequentially so they are 100% cached in memory
+            async preloadCommonLines() {
+                const essentialLines = [
+                    this.hazardLines.speedbreaker,
+                    this.hazardLines.pothole,
+                    this.hazardLines.toll,
+                    this.hazardLines.cargo_spill,
+                    this.hazardLines.bridge_padma,
+                    this.hazardLines.bridge_meghna,
+                    this.randomDialogues[0]
+                ];
+                for (const line of essentialLines) {
+                    if (!this.audioCache.has(line) && !this.pendingTexts.has(line)) {
+                        this.pendingTexts.add(line);
+                        try {
+                            await this.fetchGeminiBanglaTTS(line);
+                        } finally {
+                            this.pendingTexts.delete(line);
+                        }
+                    }
+                }
+            }
+
+            speakRandomDriverLine() {
+                const line = this.randomDialogues[Math.floor(Math.random() * this.randomDialogues.length)];
+                showBanner(`🎙️ ওস্তাদ ভয়েস: "${line}"`);
+                this.speak(line, true);
+            }
+        }
+
+        const banglaVoice = new BanglaVoiceSystem();
 
         // ==================== PLAYER SAVE & LEVEL DATA ====================
         const LEVELS = [
@@ -903,11 +1224,11 @@
                 baseY = terrainPts[idx].y * (1 - t) + terrainPts[idx + 1].y * t;
             }
 
-            // Add Speedbreaker bump curve
             for (let i = 0; i < roadFeatures.length; i++) {
                 const f = roadFeatures[i];
                 if (f.type === 'speedbreaker') {
                     const dx = worldX - f.x;
+                    // Add Speedbreaker bump curve
                     if (Math.abs(dx) < f.radius) {
                         const bump = Math.cos((dx / f.radius) * (Math.PI / 2)) * f.height;
                         baseY -= bump;
@@ -915,6 +1236,12 @@
                 }
             }
             return baseY;
+        }
+
+        // Reset hazard spoken flags when starting a new run
+        function resetHazardVoiceFlags() {
+            roadFeatures.forEach(f => { f.voiceWarned = false; });
+            bgDecors.forEach(d => { d.voiceWarned = false; });
         }
 
         // ==================== PHYSICS TRUCK & CARGO INITIALIZATION ====================
@@ -982,14 +1309,20 @@
         // ==================== PHYSICS STEP (60 FPS) ====================
         function updatePhysics() {
             if (gameState !== 'PLAYING') return;
-
-            const gravity = 0.42;
+            const gravity = 0.45;
 
             // Check Toll Plaza Barrier Blocking
             for (let f of roadFeatures) {
                 if (f.type === 'toll' && !f.gateOpen) {
                     const distToToll = f.x - truck.x;
-                    if (distToToll > -20 && distToToll < 170) {
+                    if (distToToll > -20 && distToToll < 260) {
+                        if (activeToll !== f) {
+                            banglaVoice.speak(
+                                banglaVoice.hazardLines.toll,
+                                true,
+                                () => !f.gateOpen && (f.x - truck.x) > -25
+                            );
+                        }
                         activeToll = f;
                         document.getElementById('checkpointModal').classList.remove('hidden');
                         // Physical barrier stops the truck if gate is closed
@@ -1193,7 +1526,8 @@
                             box.worldY = truck.y + box.localX * sinA + box.localY * cosA;
                             box.vx = truck.vx * 0.4 - 2.5;
                             box.vy = -3.5;
-                            showBanner(`😱 হায় হায়! ১টি ${box.label} রাস্তা পড়ে গেছে!`);
+                            showBanner(`😱 হায় হায়! ১টি ${box.label} রাস্তায় পড়ে গেছে!`);
+                            banglaVoice.speak(banglaVoice.hazardLines.cargo_spill, true);
                             sound.playThud(1.3);
                             addFloatingText(box.worldX, box.worldY - 20, `-${box.label}!`, '#ef4444');
                         }
@@ -1329,44 +1663,78 @@
         }
 
         let lastWarnX = -9999;
+        let lastSpokenBillboardX = -9999;
         function checkUpcomingHazards() {
-            // Check proximity to Mega Billboards to show interactive WhatsApp toast banner
+            // Check proximity to Mega Billboards to show interactive WhatsApp toast banner & speak ad early
             let nearMegaBillboard = null;
+            const lookAheadBillboard = 380 + Math.max(0, truck.vx * 22);
             for (let d of bgDecors) {
-                if (d.type === 'mega_billboard' && Math.abs(d.x - truck.x) < 270) {
-                    nearMegaBillboard = d;
-                    break;
+                if (d.type === 'mega_billboard') {
+                    const distB = d.x - truck.x;
+                    if (distB > -140 && distB < lookAheadBillboard) {
+                        nearMegaBillboard = d;
+                        break;
+                    }
                 }
             }
             const bbToast = document.getElementById('billboardToast');
             if (nearMegaBillboard) {
                 const titleEl = document.getElementById('bbToastTitle');
+                let voiceAdText = '';
                 if (nearMegaBillboard.adType === 'website') {
                     titleEl.textContent = '🌐 আপনার ব্যবসার ওয়েবসাইট দরকার? আজই যোগাযোগ করুন!';
+                    voiceAdText = 'মামা, আপনার ব্যবসার লাইগা কি ভালো মানের ওয়েবসাইট লাগবো? তাইলে বিলবোর্ডের হোয়াটসঅ্যাপ নাম্বারে এক্ষুনি যোগাযোগ করেন!';
                 } else if (nearMegaBillboard.adType === 'marketing') {
                     titleEl.textContent = '📈 ডিজিটাল মার্কেটিং সার্ভিস? ব্যবসার সেল বাড়ান বহুগুণ!';
+                    voiceAdText = 'ভাইজান, ডিজিটাল মার্কেটিং কইরা ব্যবসার বেচাকেনা বাড়াইতে চাইলে আমাদের হোয়াটসঅ্যাপে নক দেন!';
                 } else if (nearMegaBillboard.adType === 'onlineshop') {
                     titleEl.textContent = '🛍️ অনলাইন শপ খুলুন! ঘরে বসেই সারাদেশে পণ্য বিক্রি করুন!';
+                    voiceAdText = 'ঘরে বইসা পুরা বাংলাদেশে মাল বেচতে চান? আজই নিজের একটা অনলাইন শপ খুইলা ফেলেন!';
                 } else if (nearMegaBillboard.adType === 'ecommerce') {
                     titleEl.textContent = '🛒 ই-কমার্স ওয়েবসাইট তৈরি করে ব্যবসাকে করুন অটোমেটেড!';
+                    voiceAdText = 'ওস্তাদ, আধুনিক ই-কমার্স ওয়েবসাইট বানাইতে চাইলে বিলবোর্ডে দেওয়া হোয়াটসঅ্যাপ নাম্বারে মেসেজ দেন!';
                 } else {
                     titleEl.textContent = '💰 ভেরিফায়েড গুগল এডসেন্স একাউন্ট (Google AdSense) কিনুন!';
+                    voiceAdText = 'পিন ভেরিফায়েড গুগল এডসেন্স একাউন্ট কিনতে চাইলে দেরি না কইরা সরাসরি হোয়াটসঅ্যাপে যোগাযোগ করেন!';
                 }
                 bbToast.classList.remove('hidden');
+
+                // Only trigger billboard voice if no critical road hazard is right ahead
+                if (!nearMegaBillboard.voiceWarned && (nearMegaBillboard.x - truck.x) > 80) {
+                    nearMegaBillboard.voiceWarned = true;
+                    const targetB = nearMegaBillboard;
+                    banglaVoice.speak(voiceAdText, false, () => (targetB.x - truck.x) > -60);
+                }
             } else {
                 bbToast.classList.add('hidden');
             }
 
+            // Dynamic Speed-Compensated Look-Ahead Distance for Road Hazards (680px to 1150px ahead)
+            const dynamicLookAhead = 680 + Math.max(0, truck.vx * 34);
+            const minTriggerDist = 180; // Never start a warning if we are already on top of the obstacle
+
             for (let f of roadFeatures) {
+                if (f.voiceWarned) continue;
                 const dist = f.x - truck.x;
-                if (dist > 250 && dist < 480 && Math.abs(f.x - lastWarnX) > 380) {
-                    lastWarnX = f.x;
+
+                if (dist >= minTriggerDist && dist <= dynamicLookAhead) {
+                    f.voiceWarned = true;
+                    const hazardRef = f;
+                    // Validator ensures voice NEVER plays if the truck has already reached or passed the obstacle
+                    const isBeforeObstacle = () => (hazardRef.x - truck.x) > 65;
+
                     if (f.type === 'speedbreaker') {
                         showBanner('⚠️ সামনে গতিরোধক (Speedbreaker)! গতি কমান!');
+                        banglaVoice.speak(banglaVoice.hazardLines.speedbreaker, true, isBeforeObstacle);
                     } else if (f.type === 'pothole') {
                         showBanner('🕳️ সামনে ভাঙা রাস্তা ও গর্ত! সাবধানে ব্যালেন্স করুন!');
+                        banglaVoice.speak(banglaVoice.hazardLines.pothole, true, isBeforeObstacle);
                     } else if (f.type === 'bridge') {
                         showBanner(`🌉 সামনে ${f.name}! পিকআপ ধরে রাখুন!`);
+                        const bLine = f.name.includes('পদ্মা')
+                            ? banglaVoice.hazardLines.bridge_padma
+                            : banglaVoice.hazardLines.bridge_meghna;
+                        banglaVoice.speak(bLine, true, isBeforeObstacle);
                     }
                     break;
                 }
@@ -2607,8 +2975,10 @@
                 saveProgress();
                 populateMenuUI();
                 msgEl.textContent = `✅ আলহামদুলিল্লাহ! ${type.toUpperCase()} লেভেল ${playerData.upgrades[type]}-এ আপগ্রেড হয়েছে!`;
+                banglaVoice.speak('আলহামদুলিল্লাহ ওস্তাদ! ধোলাইখাল গ্যারেজ থেইকা গাড়ির নতুন পার্টস লাগানো হইয়া গেছে!', true);
             } else {
                 msgEl.textContent = `❌ পর্যাপ্ত টাকা নেই! আরও ডেলিভারি ট্রিপ দিয়ে টাকা আয় করুন।`;
+                banglaVoice.speak('ওস্তাদ, পকেটে তো পর্যাপ্ত টেকা নাই! আগে দুইটা ট্রিপ মাইরা টেকা কামাইয়া আনেন।', true);
             }
         };
 
@@ -2623,6 +2993,7 @@
             headlightsOn = (weatherMode === 'night' || weatherMode === 'rain');
 
             generateWorld(currentLevel);
+            resetHazardVoiceFlags();
             initTruckAndCargo();
 
             document.getElementById('hudLevelName').textContent = currentLevel.name;
@@ -2636,6 +3007,8 @@
             startTime = performance.now();
             gameState = 'PLAYING';
             sound.playMusicalHorn();
+            banglaVoice.preloadCommonLines();
+            banglaVoice.speak(`বিসমিল্লাহ কইয়া চাকা ঘুরান ওস্তাদ! গন্তব্য ${currentLevel.name}। ডাইনে বামে দেইখা সাবধানে টান দেন!`, true);
         }
 
         function finishLevel(isSuccess, reasonText) {
@@ -2659,6 +3032,12 @@
             saveProgress();
             sound.playCash();
 
+            if (isSuccess) {
+                banglaVoice.speak(`মাশাআল্লাহ ওস্তাদজী! একদম টাইমমতো আড়তে মাল পৌঁছাইয়া দিছেন! মহাজন খুশি হইয়া আপনারে ${totalEarned} টাকা বকশিশসহ ভাড়া দিছে!`, true);
+            } else {
+                banglaVoice.speak(`হায় হায় ওস্তাদ! ${reasonText} মন খারাপ কইরেন না, আরেকবার বিসমিল্লাহ কইয়া স্টার্ট দেন!`, true);
+            }
+
             document.getElementById('resultTitle').textContent = isSuccess ? 'ডেলিভারি সফল হয়েছে! 🎉' : 'ট্রিপ অসম্পূর্ণ! 😢';
             document.getElementById('resultSubtitle').textContent = reasonText;
             document.getElementById('resDistance').textContent = `${distM}m / ${currentLevel.distance}m`;
@@ -2677,6 +3056,7 @@
             if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') keys.up = true;
             if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') keys.down = true;
             if (e.key === 'h' || e.key === 'H') sound.playMusicalHorn();
+            if (e.key === 'v' || e.key === 'V') banglaVoice.speakRandomDriverLine();
             if (e.key === 'l' || e.key === 'L') headlightsOn = !headlightsOn;
         });
 
@@ -2705,6 +3085,7 @@
         bindHoldButton('btnTiltRight', 'down');
 
         document.getElementById('btnHorn').addEventListener('click', () => sound.playMusicalHorn());
+        document.getElementById('btnDriverVoice').addEventListener('click', () => banglaVoice.speakRandomDriverLine());
         document.getElementById('startTripBtn').addEventListener('click', startLevel);
         document.getElementById('btnRetry').addEventListener('click', startLevel);
 
@@ -2744,6 +3125,19 @@
         document.getElementById('soundBtn').addEventListener('click', () => {
             sound.muted = !sound.muted;
             document.getElementById('soundIcon').className = sound.muted ? 'fa-solid fa-volume-xmark text-lg text-red-400' : 'fa-solid fa-volume-high text-lg';
+            if (sound.muted) banglaVoice.stopCurrentSpeech();
+        });
+
+        document.getElementById('voiceToggleBtn').addEventListener('click', () => {
+            banglaVoice.enabled = !banglaVoice.enabled;
+            const icon = document.getElementById('voiceIcon');
+            if (banglaVoice.enabled) {
+                icon.className = 'fa-solid fa-microphone-lines text-base text-emerald-400';
+                banglaVoice.speak('ওস্তাদ, আঞ্চলিক বাংলা ভয়েস চালু হইছে!', true);
+            } else {
+                icon.className = 'fa-solid fa-microphone-lines-slash text-base text-red-400';
+                banglaVoice.stopCurrentSpeech();
+            }
         });
 
         // Allow players to click directly on any Roadside Billboard on the Canvas to open WhatsApp
@@ -2780,11 +3174,13 @@
                 document.getElementById('hudTaka').textContent = `৳ ${playerData.taka}`;
                 activeToll.gateOpen = true;
                 sound.playCash();
+                banglaVoice.speak('একশো টাকা টোল দেওয়া হইয়া গেছে ওস্তাদ, গেট খুইলা দিছে! এইবার টান দেন!', true);
                 addFloatingText(activeToll.x, activeToll.y - 90, 'টোল পরিশোধিত! ধন্যবাদ', '#22c55e');
                 document.getElementById('checkpointModal').classList.add('hidden');
                 activeToll = null;
             } else {
                 showBanner('পকেটে টাকা নেই! ভিআইপি হর্ন বাজিয়ে অনুরোধ করুন!');
+                banglaVoice.speak('ওস্তাদ পকেটে তো খুচরা টেকা নাই! ভিআইপি হর্নটা বাজাইয়া মামারে গেট খুলতে কন!', true);
             }
         });
 
@@ -2792,6 +3188,7 @@
             if (!activeToll) return;
             sound.playMusicalHorn();
             activeToll.gateOpen = true;
+            banglaVoice.speak('পোঁ পোঁ! মায়ের দোয়া পরিবহনের লাইগা ভিআইপি গেট খুইলা দিছে ওস্তাদ, টান দেন!', true);
             addFloatingText(activeToll.x, activeToll.y - 90, 'পোঁ-পোঁ! ভিআইপি পাস!', '#facc15');
             document.getElementById('checkpointModal').classList.add('hidden');
             activeToll = null;
@@ -2808,6 +3205,8 @@
             populateMenuUI();
             generateWorld(LEVELS[0]);
             initTruckAndCargo();
+            // Start pre-caching Bangla hazard voices right from the main menu so they play with 0ms delay in-game
+            banglaVoice.preloadCommonLines();
             gameLoop();
         };
     </script>
