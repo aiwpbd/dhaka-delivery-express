@@ -1324,8 +1324,23 @@
                     this.stopCurrentSpeech();
                 }
 
-                // 1. Check if device/browser has a native Bengali voice (`bn-BD` or `bn-IN`)
-                // Native browser Bangla voice has 0ms latency and works 100% offline & online!
+                // 0. Try Microsoft Edge PradeepNeural (Genuine Bangladeshi Male) via relay FIRST
+                this.fetchDirectEdgeMaleBanglaTTS(text).then(item => {
+                    if (item && item.buffer) {
+                        this.playBufferWithMaleVoiceDSP(item.buffer, item.isMale).then(ok => {
+                            if (!ok) this._fallbackSpeak(text);
+                        }).catch(() => this._fallbackSpeak(text));
+                    } else {
+                        this._fallbackSpeak(text);
+                    }
+                }).catch(() => this._fallbackSpeak(text));
+            }
+
+            // Internal fallback: browser native bn voice → Google TTS with deep pitch shift
+            _fallbackSpeak(text) {
+                if (!this.enabled || sound.muted) return;
+
+                // 1. Check if device/browser has a native Bengali voice
                 const bnMatch = this.getAnyBanglaBrowserVoice();
                 if (bnMatch && this.synth) {
                     try {
@@ -1333,24 +1348,21 @@
                         const utter = new SpeechSynthesisUtterance(text);
                         utter.voice = bnMatch.voice;
                         utter.lang = bnMatch.voice.lang || 'bn-BD';
-                        // Male tone tuning with natural brisk Bangladeshi cadence
-                        utter.rate = bnMatch.isExplicitMale ? 1.15 : 1.18;
-                        utter.pitch = bnMatch.isExplicitMale ? 0.90 : 0.62;
+                        utter.rate = bnMatch.isExplicitMale ? 1.15 : 1.00;
+                        utter.pitch = bnMatch.isExplicitMale ? 0.85 : 0.1;
                         utter.volume = 1.0;
-
                         utter.onstart = () => { this.isSpeaking = true; };
                         utter.onend = () => { this.isSpeaking = false; };
                         utter.onerror = () => {
                             this.isSpeaking = false;
                             this.playDirectBanglaAudioStream(text);
                         };
-
                         this.synth.speak(utter);
                         return;
                     } catch (e) {}
                 }
 
-                // 2. Direct HTML5 <audio> Bangla Stream (No fetch() = Zero CORS blocking on Live Server / Localhost / Preview!)
+                // 2. Direct HTML5 audio stream (Google TTS with pitch-shifted male voice)
                 this.playDirectBanglaAudioStream(text);
             }
 
@@ -1370,8 +1382,8 @@
                         try {
                             const utter = new SpeechSynthesisUtterance(text);
                             utter.lang = 'bn-BD';
-                            utter.rate = 1.12;
-                            utter.pitch = 0.70;
+                            utter.rate = 1.00;
+                            utter.pitch = 0.1;
                             utter.onend = () => { this.isSpeaking = false; };
                             utter.onerror = () => { this.isSpeaking = false; };
                             this.synth.speak(utter);
@@ -1385,11 +1397,11 @@
                     this.masterAudio.src = streamUrls[streamIdx];
                     this.masterAudio.volume = 1.0;
 
-                    // Keep natural brisk speed while shifting pitch slightly deeper for Ostad/Helper vibe
+                    // Drop pitch ~5 semitones: 0.74x rate converts Google female TTS into deep Bangladeshi Male voice
                     if ('preservesPitch' in this.masterAudio) this.masterAudio.preservesPitch = false;
                     if ('mozPreservesPitch' in this.masterAudio) this.masterAudio.mozPreservesPitch = false;
                     if ('webkitPreservesPitch' in this.masterAudio) this.masterAudio.webkitPreservesPitch = false;
-                    this.masterAudio.playbackRate = 0.92;
+                    this.masterAudio.playbackRate = 0.74;
 
                     this.isSpeaking = true;
                     let started = false;
@@ -1422,6 +1434,27 @@
                 } catch (e) {
                     this.isSpeaking = false;
                 }
+            }
+
+            // Guaranteed browser speech fallback — always uses lowest possible pitch (0.1) for male voice
+            speakBrowserBanglaGuaranteed(text, priority = false) {
+                if (!this.synth) return;
+                try {
+                    if (this.synth.paused) this.synth.resume();
+                    this.synth.cancel();
+                    const utter = new SpeechSynthesisUtterance(text);
+                    // Try bn-BD voice first, then any Bengali, then fallback
+                    const bnVoice = this.voices.find(v => v.lang && v.lang.toLowerCase().includes('bn'));
+                    if (bnVoice) utter.voice = bnVoice;
+                    utter.lang = 'bn-BD';
+                    utter.rate = 0.95;
+                    utter.pitch = 0.1; // Minimum pitch = deepest male voice possible
+                    utter.volume = 1.0;
+                    utter.onend = () => { this.isSpeaking = false; };
+                    utter.onerror = () => { this.isSpeaking = false; };
+                    this.isSpeaking = true;
+                    this.synth.speak(utter);
+                } catch (e) { this.isSpeaking = false; }
             }
 
             preloadCommonLines() {
