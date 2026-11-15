@@ -1085,62 +1085,29 @@
                 return hashArray.map(b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
             }
 
-            // Fetch Genuine Bangladeshi Male Voice (`bn-BD-PradeepNeural`) via Cloud Edge-TTS APIs + Binary Buffer Male DSP
+            // Fetch Genuine Bangladeshi Male Voice (`bn-BD-PradeepNeural`) via Cloud Edge-TTS APIs
             async fetchDirectEdgeMaleBanglaTTS(text) {
                 if (this.audioCache.has(text)) {
                     return this.audioCache.get(text);
                 }
 
-                // 1. Try Public CORS-Enabled Microsoft Edge Neural TTS Relays (`bn-BD-PradeepNeural` - Bangladeshi Male)
+                // Public CORS-Enabled Microsoft Edge Neural TTS Relays (bn-BD-PradeepNeural - Bangladeshi Male)
                 const edgeEndpoints = [
-                    {
-                        url: `https://tts.travisvn.com/?text=${encodeURIComponent(text)}&voice=bn-BD-PradeepNeural&rate=+22%25`,
-                        method: 'GET',
-                        isMale: true
-                    },
-                    {
-                        url: `https://edge-tts-api.vercel.app/api/tts?text=${encodeURIComponent(text)}&voice=bn-BD-PradeepNeural&rate=+22%25`,
-                        method: 'GET',
-                        isMale: true
-                    }
+                    `https://tts.travisvn.com/?text=${encodeURIComponent(text)}&voice=bn-BD-PradeepNeural&rate=+5%25`,
+                    `https://edge-tts-api.vercel.app/api/tts?text=${encodeURIComponent(text)}&voice=bn-BD-PradeepNeural&rate=+5%25`
                 ];
 
-                for (const ep of edgeEndpoints) {
+                for (const url of edgeEndpoints) {
                     try {
                         const ctrl = new AbortController();
-                        const tid = setTimeout(() => ctrl.abort(), 1400);
-                        const res = await fetch(ep.url, { method: ep.method, signal: ctrl.signal });
+                        const tid = setTimeout(() => ctrl.abort(), 5000);
+                        const res = await fetch(url, { signal: ctrl.signal });
                         clearTimeout(tid);
                         if (res.ok) {
                             const buf = await res.arrayBuffer();
                             if (buf && buf.byteLength > 800) {
                                 const blob = new Blob([buf], { type: 'audio/mpeg' });
                                 const item = { url: URL.createObjectURL(blob), buffer: buf, isMale: true };
-                                this.audioCache.set(text, item);
-                                return item;
-                            }
-                        }
-                    } catch (e) {}
-                }
-
-                // 2. Fetch Fast-Cadence Bangla TTS Audio ArrayBuffer via CORS-safe stream so SOLA Male Vocal Tract DSP converts it into a Deep Bangladeshi Male Voice!
-                const corsAudioUrls = [
-                    `https://translate.googleapis.com/translate_tts?client=gtx&ie=UTF-8&tl=bn&dt=t&ttsspeed=1.55&q=${encodeURIComponent(text)}`,
-                    `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(text)}&tl=bn&ttsspeed=1.55&client=tw-ob`)}`
-                ];
-
-                for (const cUrl of corsAudioUrls) {
-                    try {
-                        const ctrl = new AbortController();
-                        const tid = setTimeout(() => ctrl.abort(), 1400);
-                        const res = await fetch(cUrl, { signal: ctrl.signal, referrerPolicy: 'no-referrer' });
-                        clearTimeout(tid);
-                        if (res.ok) {
-                            const buf = await res.arrayBuffer();
-                            if (buf && buf.byteLength > 600) {
-                                const blob = new Blob([buf], { type: 'audio/mpeg' });
-                                // Marked isMale: false so playBufferWithMaleVoiceDSP shifts pitch -520 cents & speeds up to 1.62x (Fast Male Baritone!)
-                                const item = { url: URL.createObjectURL(blob), buffer: buf, isMale: false };
                                 this.audioCache.set(text, item);
                                 return item;
                             }
@@ -1307,36 +1274,87 @@
                 }
             }
 
-            // Guaranteed Direct Bangla Speech Engine (100% Pure Bangla Audio - Zero CORS Blocking!)
+            // Genuine Bangladeshi Male Natural Voice Engine
             speak(text, priority = false, isStillValidCallback = null) {
                 if (!this.enabled || sound.muted) return;
 
                 const now = performance.now();
                 if (!priority && (now - this.lastSpokenTime < 1600 || this.isSpeaking)) return;
                 if (!priority && text === this.lastMessage && now - this.lastSpokenTime < 4500) return;
-
                 if (isStillValidCallback && !isStillValidCallback()) return;
 
                 this.lastSpokenTime = now;
                 this.lastMessage = text;
 
-                if (priority) {
-                    this.stopCurrentSpeech();
+                if (priority) this.stopCurrentSpeech();
+
+                // STEP 1: If PradeepNeural already cached → play instantly (zero wait!)
+                if (this.audioCache.has(text)) {
+                    const item = this.audioCache.get(text);
+                    if (item && item.buffer) {
+                        this.playBufferWithMaleVoiceDSP(item.buffer, item.isMale);
+                        return;
+                    }
                 }
 
-                // 0. Try Microsoft Edge PradeepNeural (Genuine Bangladeshi Male) via relay FIRST
+                // STEP 2: Play immediately via SpeechSynthesis (zero latency, natural voice)
+                this._speakViaSynthesis(text);
+
+                // STEP 3: Background preload PradeepNeural for NEXT time this line is spoken
                 this.fetchDirectEdgeMaleBanglaTTS(text).then(item => {
-                    if (item && item.buffer) {
-                        this.playBufferWithMaleVoiceDSP(item.buffer, item.isMale).then(ok => {
-                            if (!ok) this._fallbackSpeak(text);
-                        }).catch(() => this._fallbackSpeak(text));
-                    } else {
-                        this._fallbackSpeak(text);
-                    }
-                }).catch(() => this._fallbackSpeak(text));
+                    // Cached for next playback — no action needed now
+                }).catch(() => {});
             }
 
-            // Internal fallback: browser native bn voice → Google TTS with deep pitch shift
+            // Instant SpeechSynthesis — খাঁটি স্বাভাবিক বাংলাদেশি পুরুষ কণ্ঠ
+            _speakViaSynthesis(text) {
+                if (!this.synth) {
+                    this.playDirectBanglaAudioStream(text);
+                    return;
+                }
+                try {
+                    if (this.synth.paused) this.synth.resume();
+                    this.synth.cancel();
+
+                    const utter = new SpeechSynthesisUtterance(text);
+                    utter.lang = 'bn-BD';
+
+                    // Prefer bn-BD male voice, then any Bengali voice
+                    if (!this.voices || this.voices.length === 0) {
+                        this.voices = this.synth.getVoices();
+                    }
+                    const maleBn = this.voices.find(v =>
+                        v.lang && v.lang.toLowerCase().includes('bn') &&
+                        /pradeep|bashkar|male|hemant/i.test(v.name)
+                    );
+                    const anyBn = this.voices.find(v =>
+                        v.lang && v.lang.toLowerCase().includes('bn')
+                    );
+                    const chosenVoice = maleBn || anyBn;
+                    if (chosenVoice) utter.voice = chosenVoice;
+
+                    // স্বাভাবিক পুরুষ কণ্ঠের সেটিং
+                    utter.rate = 1.0;    // স্বাভাবিক গতি
+                    utter.pitch = 0.85;  // সামান্য গভীর — পুরুষ কণ্ঠ, কৃত্রিম না
+                    utter.volume = 1.0;
+
+                    utter.onstart = () => { this.isSpeaking = true; };
+                    utter.onend = () => { this.isSpeaking = false; };
+                    utter.onerror = () => {
+                        this.isSpeaking = false;
+                        // SpeechSynthesis ব্যর্থ হলে Google TTS-এ fallback
+                        this.playDirectBanglaAudioStream(text);
+                    };
+
+                    this.isSpeaking = true;
+                    this.synth.speak(utter);
+                } catch (e) {
+                    this.isSpeaking = false;
+                    this.playDirectBanglaAudioStream(text);
+                }
+            }
+
+            // Internal fallback: browser native bn voice → Google TTS
             _fallbackSpeak(text) {
                 if (!this.enabled || sound.muted) return;
 
@@ -1397,11 +1415,11 @@
                     this.masterAudio.src = streamUrls[streamIdx];
                     this.masterAudio.volume = 1.0;
 
-                    // Slight pitch drop for natural male tone (not robotic)
-                    if ('preservesPitch' in this.masterAudio) this.masterAudio.preservesPitch = false;
-                    if ('mozPreservesPitch' in this.masterAudio) this.masterAudio.mozPreservesPitch = false;
-                    if ('webkitPreservesPitch' in this.masterAudio) this.masterAudio.webkitPreservesPitch = false;
-                    this.masterAudio.playbackRate = 0.90;
+                    // স্বাভাবিক গতিতে চালাও — Google TTS bn-BD voice natural speed
+                    if ('preservesPitch' in this.masterAudio) this.masterAudio.preservesPitch = true;
+                    if ('mozPreservesPitch' in this.masterAudio) this.masterAudio.mozPreservesPitch = true;
+                    if ('webkitPreservesPitch' in this.masterAudio) this.masterAudio.webkitPreservesPitch = true;
+                    this.masterAudio.playbackRate = 1.0;
 
                     this.isSpeaking = true;
                     let started = false;
