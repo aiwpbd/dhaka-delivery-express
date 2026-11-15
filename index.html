@@ -1202,78 +1202,58 @@
             }
 
             // ============================================================
-            // ============ সরল ও নির্ভরযোগ্য বাংলা ভয়েস ইঞ্জিন ============
+            // ======= নতুন পদ্ধতি: সরাসরি Google TTS Audio =======
+            // SpeechSynthesis বাদ — শুধু Audio Element, সব browser-এ কাজ করে
             speak(text, priority = false, isStillValidCallback = null) {
                 if (!this.enabled || sound.muted) return;
-                const now = performance.now();
-                if (!priority && now - this.lastSpokenTime < 2500) return;
                 if (isStillValidCallback && !isStillValidCallback()) return;
+
+                const now = performance.now();
+                if (!priority && now - this.lastSpokenTime < 2000) return;
                 this.lastSpokenTime = now;
                 this.lastMessage = text;
-                if (priority) this.stopCurrentSpeech();
-                this._sayIt(text);
-            }
 
-            // মূল ভয়েস ফাংশন — SpeechSynthesis → Google TTS
-            _sayIt(text) {
-                // ১. SpeechSynthesis (সবচেয়ে নির্ভরযোগ্য — কোনো internet লাগে না)
-                if (window.speechSynthesis) {
-                    try {
-                        window.speechSynthesis.cancel();
-                        const u = new SpeechSynthesisUtterance(text);
-                        u.lang = 'bn-BD';
-                        u.volume = 1.0;
-                        u.rate = 1.0;
-                        u.pitch = 1.0;
+                // সব চলমান ভয়েস বন্ধ করো
+                try { this.masterAudio.pause(); } catch(e) {}
+                if (window.speechSynthesis) { try { window.speechSynthesis.cancel(); } catch(e) {} }
 
-                        // Bengali voice খোঁজো (Edge-এ PradeepNeural থাকে)
-                        const vs = window.speechSynthesis.getVoices();
-                        const bn = vs.find(v => v.lang && v.lang.toLowerCase().startsWith('bn'));
-                        if (bn) u.voice = bn;
-
-                        u.onerror = () => this._googleTTS(text);
-                        window.speechSynthesis.speak(u);
-                        return;
-                    } catch(e) {}
-                }
-                // ২. Google TTS audio stream
-                this._googleTTS(text);
-            }
-
-            // Google TTS fallback
-            _googleTTS(text) {
-                if (!this.enabled || sound.muted) return;
+                // Google TTS দিয়ে সরাসরি বাজাও
                 const enc = encodeURIComponent(text);
-                const src = `https://translate.googleapis.com/translate_tts?client=gtx&ie=UTF-8&tl=bn&dt=t&q=${enc}`;
-                try {
-                    this.masterAudio.pause();
-                    this.masterAudio.src = src;
+                const urls = [
+                    `https://translate.googleapis.com/translate_tts?client=gtx&ie=UTF-8&tl=bn&dt=t&q=${enc}`,
+                    `https://translate.google.com/translate_tts?ie=UTF-8&q=${enc}&tl=bn&client=tw-ob`
+                ];
+
+                let tried = 0;
+                const tryPlay = () => {
+                    if (tried >= urls.length) return;
+                    this.masterAudio.src = urls[tried++];
                     this.masterAudio.volume = 1.0;
                     this.masterAudio.playbackRate = 1.0;
-                    if ('preservesPitch' in this.masterAudio) this.masterAudio.preservesPitch = true;
+                    this.masterAudio.onerror = () => tryPlay();
                     const p = this.masterAudio.play();
-                    if (p) p.catch(() => {});
-                } catch(e) {}
+                    if (p) p.catch(() => tryPlay());
+                };
+                tryPlay();
             }
 
-            // Legacy compatibility — সব পুরনো call এখানে আসবে
-            playDirectBanglaAudioStream(text) { this._sayIt(text); }
-            speakBrowserBanglaGuaranteed(text) { this._sayIt(text); }
-            _fallbackSpeak(text) { this._googleTTS(text); }
-            _speakViaSynthesis(text) { this._sayIt(text); }
-            _playAudioUrl(url) {
-                try { this.masterAudio.pause(); this.masterAudio.src = url; this.masterAudio.play(); } catch(e) {}
-            }
-            _playUrl(url) { this._playAudioUrl(url); }
-            _playGoogleTTS(text) { this._googleTTS(text); }
-            _fetchPradeepThenPlay(text) { this._sayIt(text); }
-
+            // ===== Legacy compatibility methods =====
             stopCurrentSpeech() {
                 try { this.masterAudio.pause(); } catch(e) {}
                 if (this.currentSource) { try { this.currentSource.stop(); } catch(e) {} this.currentSource = null; }
                 if (window.speechSynthesis) { try { window.speechSynthesis.cancel(); } catch(e) {} }
                 this.isSpeaking = false;
             }
+            playDirectBanglaAudioStream(text) { this.speak(text, true); }
+            speakBrowserBanglaGuaranteed(text) { this.speak(text, true); }
+            _fallbackSpeak(text) { this.speak(text, true); }
+            _speakViaSynthesis(text) { this.speak(text, true); }
+            _sayIt(text) { this.speak(text, true); }
+            _googleTTS(text) { this.speak(text, true); }
+            _playGoogleTTS(text) { this.speak(text, true); }
+            _fetchPradeepThenPlay(text) { this.speak(text, true); }
+            _playAudioUrl(url) { try { this.masterAudio.pause(); this.masterAudio.src = url; this.masterAudio.play(); } catch(e) {} }
+            _playUrl(url) { this._playAudioUrl(url); }
 
             preloadCommonLines() {
                 if (this.synth) this.voices = this.synth.getVoices();
