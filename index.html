@@ -1202,42 +1202,43 @@
             }
 
             // ============================================================
-            // ======= নতুন পদ্ধতি: সরাসরি Google TTS Audio =======
-            // SpeechSynthesis বাদ — শুধু Audio Element, সব browser-এ কাজ করে
+            // ======= SpeechSynthesis পুরুষ কণ্ঠ — শুধুমাত্র Browser Built-in TTS =======
             speak(text, priority = false, isStillValidCallback = null) {
                 if (!this.enabled || sound.muted) return;
                 if (isStillValidCallback && !isStillValidCallback()) return;
-
                 const now = performance.now();
                 if (!priority && now - this.lastSpokenTime < 2000) return;
                 this.lastSpokenTime = now;
                 this.lastMessage = text;
 
-                // সব চলমান ভয়েস বন্ধ করো
-                try { this.masterAudio.pause(); } catch(e) {}
-                if (window.speechSynthesis) { try { window.speechSynthesis.cancel(); } catch(e) {} }
+                if (!window.speechSynthesis) return;
+                const synth = window.speechSynthesis;
+                synth.cancel();
 
-                // Google TTS দিয়ে সরাসরি বাজাও
-                const enc = encodeURIComponent(text);
-                const urls = [
-                    `https://translate.googleapis.com/translate_tts?client=gtx&ie=UTF-8&tl=bn&dt=t&q=${enc}`,
-                    `https://translate.google.com/translate_tts?ie=UTF-8&q=${enc}&tl=bn&client=tw-ob`
-                ];
+                const u = new SpeechSynthesisUtterance(text);
+                u.lang = 'bn-BD';
+                u.volume = 1.0;
+                u.rate = 1.0;
+                u.pitch = 1.0;
 
-                let tried = 0;
-                const tryPlay = () => {
-                    if (tried >= urls.length) return;
-                    this.masterAudio.src = urls[tried++];
-                    this.masterAudio.volume = 1.0;
-                    this.masterAudio.playbackRate = 1.0;
-                    this.masterAudio.onerror = () => tryPlay();
-                    const p = this.masterAudio.play();
-                    if (p) p.catch(() => tryPlay());
+                // পুরুষ কণ্ঠ খোঁজো — Priority: PradeepNeural > Male Bengali > Any Bengali
+                const findVoice = () => {
+                    const vs = synth.getVoices();
+                    return vs.find(v => /pradeep/i.test(v.name)) ||
+                           vs.find(v => v.lang && v.lang.startsWith('bn') && /male|man|hemant|bashkar|prabhat/i.test(v.name)) ||
+                           vs.find(v => v.lang && v.lang.startsWith('bn'));
                 };
-                tryPlay();
+
+                const chosen = findVoice();
+                if (chosen) {
+                    u.voice = chosen;
+                    u.lang = chosen.lang;
+                }
+
+                synth.speak(u);
             }
 
-            // ===== Legacy compatibility methods =====
+            // ===== Legacy compatibility =====
             stopCurrentSpeech() {
                 try { this.masterAudio.pause(); } catch(e) {}
                 if (this.currentSource) { try { this.currentSource.stop(); } catch(e) {} this.currentSource = null; }
@@ -1251,7 +1252,9 @@
             _sayIt(text) { this.speak(text, true); }
             _googleTTS(text) { this.speak(text, true); }
             _playGoogleTTS(text) { this.speak(text, true); }
+            _ttsAudio(text) { this.speak(text, true); }
             _fetchPradeepThenPlay(text) { this.speak(text, true); }
+            _phoneticFallback(text) { this.speak(text, true); }
             _playAudioUrl(url) { try { this.masterAudio.pause(); this.masterAudio.src = url; this.masterAudio.play(); } catch(e) {} }
             _playUrl(url) { this._playAudioUrl(url); }
 
