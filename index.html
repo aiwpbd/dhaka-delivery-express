@@ -1274,12 +1274,15 @@
                 }
             }
 
-            // Genuine Bangladeshi Male Natural Voice Engine
+            // ============================================================
+            // খাঁটি বাংলাদেশি পুরুষ কণ্ঠ — PradeepNeural Voice Engine
+            // Priority: Cache → Edge PradeepNeural relay → Google TTS
+            // ============================================================
             speak(text, priority = false, isStillValidCallback = null) {
                 if (!this.enabled || sound.muted) return;
 
                 const now = performance.now();
-                if (!priority && (now - this.lastSpokenTime < 2000 || this.isSpeaking)) return;
+                if (!priority && this.isSpeaking && (now - this.lastSpokenTime < 3000)) return;
                 if (!priority && text === this.lastMessage && now - this.lastSpokenTime < 5000) return;
                 if (isStillValidCallback && !isStillValidCallback()) return;
 
@@ -1288,228 +1291,108 @@
 
                 if (priority) this.stopCurrentSpeech();
 
-                // STEP 1: If PradeepNeural already cached → play instantly
+                // STEP 1: PradeepNeural already cached? তাৎক্ষণিক বাজাও
                 if (this.audioCache.has(text)) {
-                    const item = this.audioCache.get(text);
-                    if (item && item.url) {
-                        this._playAudioUrl(item.url);
-                        return;
-                    }
+                    const cached = this.audioCache.get(text);
+                    if (cached && cached.url) { this._playUrl(cached.url); return; }
                 }
 
-                // STEP 2: Play immediately via Google TTS audio stream (always works)
-                this.playDirectBanglaAudioStream(text);
-
-                // STEP 3: Background preload PradeepNeural for NEXT time
-                this.fetchDirectEdgeMaleBanglaTTS(text).catch(() => {});
+                // STEP 2: Edge PradeepNeural relay → genuine Bangladeshi male voice
+                this._fetchPradeepThenPlay(text);
             }
 
-            // সরাসরি Audio URL বাজাও
-            _playAudioUrl(url) {
+            // Edge TTS PradeepNeural fetch করে বাজাও, না হলে Google TTS
+            _fetchPradeepThenPlay(text) {
+                const relays = [
+                    `https://tts.travisvn.com/?text=${encodeURIComponent(text)}&voice=bn-BD-PradeepNeural&rate=+0%25`,
+                    `https://edge-tts-api.vercel.app/api/tts?text=${encodeURIComponent(text)}&voice=bn-BD-PradeepNeural&rate=+0%25`
+                ];
+                let idx = 0;
+                const tryNext = () => {
+                    if (idx >= relays.length) { this._playGoogleTTS(text); return; }
+                    const url = relays[idx++];
+                    const ctrl = new AbortController();
+                    const tid = setTimeout(() => { ctrl.abort(); tryNext(); }, 4500);
+                    fetch(url, { signal: ctrl.signal })
+                        .then(res => { clearTimeout(tid); if (!res.ok) { tryNext(); return null; } return res.arrayBuffer(); })
+                        .then(buf => {
+                            if (!buf || buf.byteLength < 500) { tryNext(); return; }
+                            const blobUrl = URL.createObjectURL(new Blob([buf], { type: "audio/mpeg" }));
+                            this.audioCache.set(text, { url: blobUrl });
+                            this._playUrl(blobUrl);
+                        })
+                        .catch(() => { clearTimeout(tid); tryNext(); });
+                };
+                tryNext();
+            }
+
+            // Audio URL বাজাও — স্বাভাবিক গতি
+            _playUrl(src) {
                 try {
                     this.masterAudio.pause();
-                    this.masterAudio.src = url;
+                    this.masterAudio.src = src;
                     this.masterAudio.volume = 1.0;
-                    if ('preservesPitch' in this.masterAudio) this.masterAudio.preservesPitch = true;
                     this.masterAudio.playbackRate = 1.0;
+                    if ("preservesPitch" in this.masterAudio) this.masterAudio.preservesPitch = true;
                     this.isSpeaking = true;
+                    this.masterAudio.onended = () => { this.isSpeaking = false; };
+                    this.masterAudio.onerror = () => { this.isSpeaking = false; };
                     const p = this.masterAudio.play();
                     if (p) p.catch(() => { this.isSpeaking = false; });
                 } catch(e) { this.isSpeaking = false; }
             }
 
-            // Instant SpeechSynthesis — খাঁটি স্বাভাবিক বাংলাদেশি পুরুষ কণ্ঠ
-            _speakViaSynthesis(text) {
-                if (!this.synth) {
-                    this.playDirectBanglaAudioStream(text);
-                    return;
-                }
-                try {
-                    if (this.synth.paused) this.synth.resume();
-                    this.synth.cancel();
-
-                    const utter = new SpeechSynthesisUtterance(text);
-                    utter.lang = 'bn-BD';
-
-                    // Prefer bn-BD male voice, then any Bengali voice
-                    if (!this.voices || this.voices.length === 0) {
-                        this.voices = this.synth.getVoices();
-                    }
-                    const maleBn = this.voices.find(v =>
-                        v.lang && v.lang.toLowerCase().includes('bn') &&
-                        /pradeep|bashkar|male|hemant/i.test(v.name)
-                    );
-                    const anyBn = this.voices.find(v =>
-                        v.lang && v.lang.toLowerCase().includes('bn')
-                    );
-                    const chosenVoice = maleBn || anyBn;
-                    if (chosenVoice) utter.voice = chosenVoice;
-
-                    // স্বাভাবিক পুরুষ কণ্ঠের সেটিং
-                    utter.rate = 1.0;    // স্বাভাবিক গতি
-                    utter.pitch = 0.85;  // সামান্য গভীর — পুরুষ কণ্ঠ, কৃত্রিম না
-                    utter.volume = 1.0;
-
-                    utter.onstart = () => { this.isSpeaking = true; };
-                    utter.onend = () => { this.isSpeaking = false; };
-                    utter.onerror = () => {
-                        this.isSpeaking = false;
-                        // SpeechSynthesis ব্যর্থ হলে Google TTS-এ fallback
-                        this.playDirectBanglaAudioStream(text);
-                    };
-
-                    this.isSpeaking = true;
-                    this.synth.speak(utter);
-                } catch (e) {
-                    this.isSpeaking = false;
-                    this.playDirectBanglaAudioStream(text);
-                }
-            }
-
-            // Internal fallback: browser native bn voice → Google TTS
-            _fallbackSpeak(text) {
+            // Google TTS fallback — সবসময় কাজ করে
+            _playGoogleTTS(text) {
                 if (!this.enabled || sound.muted) return;
-
-                // 1. Check if device/browser has a native Bengali voice
-                const bnMatch = this.getAnyBanglaBrowserVoice();
-                if (bnMatch && this.synth) {
-                    try {
-                        if (this.synth.paused) this.synth.resume();
-                        const utter = new SpeechSynthesisUtterance(text);
-                        utter.voice = bnMatch.voice;
-                        utter.lang = bnMatch.voice.lang || 'bn-BD';
-                        utter.rate = bnMatch.isExplicitMale ? 1.10 : 1.05;
-                        utter.pitch = bnMatch.isExplicitMale ? 1.0 : 0.85;
-                        utter.volume = 1.0;
-                        utter.onstart = () => { this.isSpeaking = true; };
-                        utter.onend = () => { this.isSpeaking = false; };
-                        utter.onerror = () => {
-                            this.isSpeaking = false;
-                            this.playDirectBanglaAudioStream(text);
-                        };
-                        this.synth.speak(utter);
-                        return;
-                    } catch (e) {}
-                }
-
-                // 2. Direct HTML5 audio stream (Google TTS with pitch-shifted male voice)
-                this.playDirectBanglaAudioStream(text);
-            }
-
-            playDirectBanglaAudioStream(text, streamIdx = 0) {
-                if (!this.enabled || sound.muted) return;
-
-                const encoded = encodeURIComponent(text);
-                const streamUrls = [
-                    `https://translate.googleapis.com/translate_tts?client=gtx&ie=UTF-8&tl=bn&dt=t&q=${encoded}`,
-                    `https://translate.google.com/translate_tts?ie=UTF-8&q=${encoded}&tl=bn&client=tw-ob`
+                const enc = encodeURIComponent(text);
+                const urls = [
+                    `https://translate.googleapis.com/translate_tts?client=gtx&ie=UTF-8&tl=bn&dt=t&q=${enc}`,
+                    `https://translate.google.com/translate_tts?ie=UTF-8&q=${enc}&tl=bn&client=tw-ob`
                 ];
-
-                // সব URL ব্যর্থ হলে SpeechSynthesis দিয়ে শেষ চেষ্টা
-                if (streamIdx >= streamUrls.length) {
-                    this.isSpeaking = false;
-                    if (this.synth) {
-                        try {
-                            this.synth.cancel();
-                            const utter = new SpeechSynthesisUtterance(text);
-                            utter.lang = 'bn-BD';
-                            utter.rate = 1.0;
-                            utter.pitch = 0.85;
-                            utter.volume = 1.0;
-                            utter.onend = () => { this.isSpeaking = false; };
-                            utter.onerror = () => { this.isSpeaking = false; };
-                            this.synth.speak(utter);
-                        } catch (e) { this.isSpeaking = false; }
-                    }
-                    return;
-                }
-
-                try {
-                    this.masterAudio.pause();
-                    this.masterAudio.currentTime = 0;
-                    this.masterAudio.src = streamUrls[streamIdx];
-                    this.masterAudio.volume = 1.0;
-                    this.masterAudio.playbackRate = 1.0;
-                    if ('preservesPitch' in this.masterAudio) this.masterAudio.preservesPitch = true;
-
-                    this.isSpeaking = true;
-                    let started = false;
-
-                    // isSpeaking স্বয়ংক্রিয় reset — ৮ সেকেন্ড পর stuck হবে না
-                    const safeReset = setTimeout(() => {
-                        this.isSpeaking = false;
-                    }, 8000);
-
-                    const timeoutId = setTimeout(() => {
-                        if (!started) {
-                            clearTimeout(safeReset);
-                            this.isSpeaking = false;
-                            this.playDirectBanglaAudioStream(text, streamIdx + 1);
-                        }
-                    }, 2500);
-
-                    this.masterAudio.onplaying = () => {
-                        started = true;
-                        clearTimeout(timeoutId);
-                    };
-
-                    this.masterAudio.onended = () => {
-                        clearTimeout(safeReset);
-                        this.isSpeaking = false;
-                    };
-
-                    this.masterAudio.onerror = () => {
-                        clearTimeout(timeoutId);
-                        clearTimeout(safeReset);
-                        this.isSpeaking = false;
-                        this.playDirectBanglaAudioStream(text, streamIdx + 1);
-                    };
-
-                    const p = this.masterAudio.play();
-                    if (p) {
-                        p.catch(() => {
-                            clearTimeout(timeoutId);
-                            clearTimeout(safeReset);
-                            this.isSpeaking = false;
-                            this.playDirectBanglaAudioStream(text, streamIdx + 1);
-                        });
-                    }
-                } catch (e) {
-                    this.isSpeaking = false;
-                }
+                let i = 0;
+                const try1 = () => {
+                    if (i >= urls.length) { this.isSpeaking = false; return; }
+                    try {
+                        this.masterAudio.pause();
+                        this.masterAudio.src = urls[i++];
+                        this.masterAudio.volume = 1.0;
+                        this.masterAudio.playbackRate = 1.0;
+                        if ("preservesPitch" in this.masterAudio) this.masterAudio.preservesPitch = true;
+                        this.isSpeaking = true;
+                        let ok = false;
+                        const t = setTimeout(() => { if (!ok) { this.isSpeaking = false; try1(); } }, 3500);
+                        this.masterAudio.onplaying = () => { ok = true; clearTimeout(t); };
+                        this.masterAudio.onended = () => { clearTimeout(t); this.isSpeaking = false; };
+                        this.masterAudio.onerror = () => { clearTimeout(t); this.isSpeaking = false; try1(); };
+                        const p = this.masterAudio.play();
+                        if (p) p.catch(() => { clearTimeout(t); this.isSpeaking = false; try1(); });
+                    } catch(e) { this.isSpeaking = false; }
+                };
+                try1();
             }
 
-            // Guaranteed browser speech fallback — always uses lowest possible pitch (0.1) for male voice
-            speakBrowserBanglaGuaranteed(text, priority = false) {
-                if (!this.synth) return;
-                try {
-                    if (this.synth.paused) this.synth.resume();
-                    this.synth.cancel();
-                    const utter = new SpeechSynthesisUtterance(text);
-                    // Try bn-BD voice first, then any Bengali, then fallback
-                    const bnVoice = this.voices.find(v => v.lang && v.lang.toLowerCase().includes('bn'));
-                    if (bnVoice) utter.voice = bnVoice;
-                    utter.lang = 'bn-BD';
-                    utter.rate = 0.95;
-                    utter.pitch = 0.85; // Natural male pitch
-                    utter.volume = 1.0;
-                    utter.onend = () => { this.isSpeaking = false; };
-                    utter.onerror = () => { this.isSpeaking = false; };
-                    this.isSpeaking = true;
-                    this.synth.speak(utter);
-                } catch (e) { this.isSpeaking = false; }
+            // Legacy compatibility
+            playDirectBanglaAudioStream(text) { this._playGoogleTTS(text); }
+            speakBrowserBanglaGuaranteed(text) { this._fetchPradeepThenPlay(text); }
+            _fallbackSpeak(text) { this._playGoogleTTS(text); }
+            _speakViaSynthesis(text) { this._fetchPradeepThenPlay(text); }
+            _playAudioUrl(url) { this._playUrl(url); }
+
+            stopCurrentSpeech() {
+                try { this.masterAudio.pause(); } catch(e) {}
+                if (this.currentSource) { try { this.currentSource.stop(); } catch(e) {} this.currentSource = null; }
+                if (this.synth) { try { this.synth.cancel(); } catch(e) {} }
+                this.isSpeaking = false;
             }
 
             preloadCommonLines() {
-                // Warm up voice list on load
-                if (this.synth) {
-                    this.voices = this.synth.getVoices();
-                }
+                if (this.synth) this.voices = this.synth.getVoices();
             }
 
             speakRandomDriverLine() {
                 const line = this.randomDialogues[Math.floor(Math.random() * this.randomDialogues.length)];
-                showBanner(`🎙️ ওস্তাদ ভয়েস: "${line}"`);
+                showBanner(`🎙️ ওস্তাদ ভয়েস: "${line}"`);
                 this.speak(line, true);
             }
         }
